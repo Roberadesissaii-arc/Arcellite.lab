@@ -14,7 +14,7 @@ export function StorageView() {
   const state = useDeployState()
   const now = useNow()
   const [id, setId] = useState<string | null>(null)
-  if (!state) return <PageSkeleton />
+  if (!state) return <PageSkeleton variant="cards" />
   const selected = state.volumes.find((volume) => volume.id === id) ?? null
   const total = Math.round(state.volumes.reduce((sum, volume) => sum + volume.sizeGb, 0) * 10) / 10
   const backedUp = state.volumes.filter((volume) => volume.lastBackupAt).length

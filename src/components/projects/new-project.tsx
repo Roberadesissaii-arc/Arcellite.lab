@@ -4,7 +4,8 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useForm, useWatch } from "react-hook-form"
 import { z } from "zod"
-import { ArrowRight, Upload } from "lucide-react"
+import { ArrowRight, Check, Container, GitBranch, Layers, Rocket, Upload } from "lucide-react"
+import { IconTile, SectionHeading, Tag } from "@/components/ui/kit"
 import { GitHubMark } from "@/components/brand"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
@@ -26,6 +27,12 @@ import { nextFreePort, portTaken } from "@/lib/deploy/helpers"
 import { useDeploy, useDeployState } from "@/lib/deploy/react"
 import { useReducedMotion } from "motion/react"
 import { DeployError, type AnalysisResult, type EnvironmentVariable, type Framework, type GitRepository, type ProjectSource } from "@/lib/deploy/types"
+
+const STEPS: { label: string; stages: string[] }[] = [
+  { label: "Source", stages: ["choose", "github", "upload", "git", "image", "compose"] },
+  { label: "Analyze", stages: ["analyze"] },
+  { label: "Configure", stages: ["configure"] },
+]
 
 const schema = z.object({
   name: z.string().trim().min(1, "Name the project."),
@@ -120,7 +127,7 @@ export function NewProjectView() {
     return state.repositories.filter((item) => !query || `${item.fullName} ${item.description} ${item.language}`.toLowerCase().includes(query))
   }, [state, repoQuery])
 
-  if (!state) return <PageSkeleton />
+  if (!state) return <PageSkeleton variant="detail" />
 
   function beginAnalysis(nextSource: ProjectSource, files: string[], suggestedName: string, suggestedBranch: string | null, environment?: FormValues["environment"]) {
     const result = analysisFromFiles(files)
@@ -243,36 +250,75 @@ export function NewProjectView() {
 
   return (
     <div className="page new-project-page">
-      <p className="page-kicker">
-        {stage === "choose" ? "Source" : stage === "analyze" ? "Analyze" : stage === "configure" ? "Configure" : "Source"}
-      </p>
+      <ol className="np-steps" aria-label="Progress">
+        {STEPS.map((step, index) => {
+          const current = STEPS.findIndex((item) => item.stages.includes(stage))
+          return (
+            <li key={step.label} data-state={index < current ? "done" : index === current ? "current" : "todo"} aria-current={index === current ? "step" : undefined}>
+              <span className="np-step-dot">{index < current ? <Check aria-hidden /> : index + 1}</span>
+              <span className="np-step-label">{step.label}</span>
+            </li>
+          )
+        })}
+      </ol>
       {stage === "choose" ? (
         <>
-          <PageHeader title="Deploy something new" description="Bring an application online from source code, a local project, or an existing container." />
-          <div className="source-choices mt-7">
-            <button type="button" className="choice source-choice pressable" onClick={() => setStage("github")}>
-              <GitHubMark className="mt-1 h-5 w-5" />
-              <span>
-                <span className="block font-semibold">GitHub</span>
-                <span className="text-sm text-muted">Import an existing repository.</span>
-              </span><ArrowRight className="ml-auto h-4 w-4 self-center text-faint" aria-hidden />
-            </button>
-            <button type="button" className="choice source-choice pressable" onClick={() => setStage("upload")}>
-              <Upload className="mt-1 h-5 w-5 shrink-0" aria-hidden />
-              <span>
-                <span className="block font-semibold">Upload</span>
-                <span className="text-sm text-muted">Upload a project archive or select a local folder.</span>
-              </span><ArrowRight className="ml-auto h-4 w-4 self-center text-faint" aria-hidden />
-            </button>
-          </div>
-          <details className="mt-6">
-            <summary className="cursor-pointer text-sm text-muted">More ways</summary>
-            <div className="mt-3 grid gap-2">
-              <button type="button" className="choice" onClick={() => setStage("git")}>Git repository URL</button>
-              <button type="button" className="choice" onClick={() => setStage("image")}>Docker image</button>
-              <button type="button" className="choice" onClick={() => setStage("compose")}>Docker Compose</button>
+          <PageHeader icon={Rocket} kicker="New project" title="Deploy something new" description="Bring an application online from source code, a local project, or an existing container." />
+          <section className="mt-8">
+            <SectionHeading title="Choose a source" />
+            <div className="np-primary">
+              <button type="button" className="np-card pressable" onClick={() => setStage("github")}>
+                <span className="np-card-head">
+                  <span className="np-card-icon np-card-icon-dark"><GitHubMark className="h-5 w-5" /></span>
+                  <Tag tone="brand">Recommended</Tag>
+                </span>
+                <strong>Import from GitHub</strong>
+                <small>Pick a repository and branch. Arcellite detects the framework and fills in the build.</small>
+                <ul className="np-points">
+                  <li><Check aria-hidden />Redeploy on every push</li>
+                  <li><Check aria-hidden />Branch and commit on each release</li>
+                  <li><Check aria-hidden />{state.github.connected ? `Connected as @${state.github.accountLogin}` : "Connect in one step"}</li>
+                </ul>
+                <span className="np-card-cta">Continue with GitHub<ArrowRight aria-hidden /></span>
+              </button>
+              <button type="button" className="np-card pressable" onClick={() => setStage("upload")}>
+                <span className="np-card-head">
+                  <span className="np-card-icon"><Upload aria-hidden /></span>
+                  <Tag>No Git needed</Tag>
+                </span>
+                <strong>Upload a project</strong>
+                <small>Drop a .zip archive or choose a local folder. Good for quick experiments and private code.</small>
+                <ul className="np-points">
+                  <li><Check aria-hidden />.zip, .tar.gz, or a folder</li>
+                  <li><Check aria-hidden />Same detection as GitHub</li>
+                  <li><Check aria-hidden />Upload again to redeploy</li>
+                </ul>
+                <span className="np-card-cta">Upload files<ArrowRight aria-hidden /></span>
+              </button>
             </div>
-          </details>
+          </section>
+          <section className="mt-8">
+            <SectionHeading title="More ways to deploy" />
+            <div className="np-more">
+              {([
+                ["git", GitBranch, "Git repository URL", "Any public repository by URL."],
+                ["image", Container, "Docker image", "Run an image from a registry."],
+                ["compose", Layers, "Docker Compose", "Several services from one file."],
+              ] as const).map(([target, Icon, title, body]) => (
+                <button key={target} type="button" className="np-mini pressable" onClick={() => setStage(target)}>
+                  <IconTile icon={Icon} tone="neutral" />
+                  <span className="min-w-0 flex-1"><strong>{title}</strong><small>{body}</small></span>
+                  <ArrowRight aria-hidden className="np-mini-arrow" />
+                </button>
+              ))}
+            </div>
+          </section>
+          <section className="np-frameworks">
+            <p>Detected automatically</p>
+            <div>
+              {(["nextjs", "vite", "node", "express", "fastapi", "flask", "static", "dockerfile"] as const).map((key) => <Tag key={key}>{FRAMEWORKS[key].label}</Tag>)}
+            </div>
+          </section>
         </>
       ) : null}
 

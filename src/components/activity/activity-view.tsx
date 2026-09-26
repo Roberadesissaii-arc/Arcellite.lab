@@ -39,7 +39,7 @@ export function ActivityView() {
           </div>
         </div>
         <div className="mt-3">
-          {rows.length === 0 ? <EmptyPanel icon={MonitorDot} title="No activity" body="Actions you take in this workspace will show up here." /> : <ActivityTimeline events={rows} now={now} showActor />}
+          {rows.length === 0 ? <EmptyPanel icon={MonitorDot} title="No activity" body="Actions you take in this workspace will show up here." /> : <ActivityTimeline key={result} events={rows} now={now} showActor pageSize={6} />}
         </div>
       </section>
     </div>

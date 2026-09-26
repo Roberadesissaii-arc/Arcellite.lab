@@ -38,7 +38,7 @@ export function ProjectFrame({ children }: { children: React.ReactNode }) {
     if (project) document.title = `${project.name} · Arcellite Deploy`
   }, [project])
 
-  if (!state) return <PageSkeleton />
+  if (!state) return <PageSkeleton variant="detail" />
   if (!project) {
     return (
       <div className="page">

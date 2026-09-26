@@ -1,8 +1,6 @@
-import type { Metadata } from "next"
-import { JobsView } from "@/components/jobs/jobs-view"
+import { permanentRedirect } from "next/navigation"
 
-export const metadata: Metadata = { title: "Jobs" }
-
+/** Jobs was renamed to Pipelines; keep old links working. */
 export default function Page() {
-  return <JobsView />
+  permanentRedirect("/pipelines")
 }

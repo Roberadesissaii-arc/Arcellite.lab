@@ -29,7 +29,7 @@ export function DatabasesView() {
   const [search, setSearch] = useState("")
   const [engine, setEngine] = useState("all")
   const [status, setStatus] = useState("all")
-  if (!state) return <PageSkeleton />
+  if (!state) return <PageSkeleton variant="cards" />
   const selected = state.databases.find((database) => database.id === id) ?? null
   const running = state.databases.filter((database) => database.status === "running").length
   const storage = Math.round(state.databases.reduce((sum, database) => sum + database.storageGb, 0) * 10) / 10

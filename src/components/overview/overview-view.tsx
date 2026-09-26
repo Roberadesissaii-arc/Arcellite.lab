@@ -17,7 +17,7 @@ function SectionHeading({ title, href, action = "View all" }: { title: string; h
 export function OverviewView() {
   const state = useDeployState()
   const now = useNow(15000)
-  if (!state) return <PageSkeleton />
+  if (!state) return <PageSkeleton variant="overview" />
   const server = homeServer(state)
   const projects = [...state.projects].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
   const activity = state.activity.slice(0, 5)

@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react"
 import Link from "next/link"
-import { Activity, ArrowUp, ArrowUpRight, Globe2, Layers, Server, Sparkle, Trash2, TriangleAlert, type LucideIcon } from "lucide-react"
+import { Activity, ArrowUp, ArrowUpRight, Globe2, Info, Layers, Server, Sparkle, Trash2, TriangleAlert, type LucideIcon } from "lucide-react"
 import { useDeployState } from "@/lib/deploy/react"
 import { answerProjectQuestion, type AssistantReply } from "@/lib/deploy/assistant"
+import { formatReply } from "@/lib/deploy/assistant-format"
 import { useNow } from "@/lib/use-now"
 import { PageSkeleton } from "@/components/ui/bits"
 import { SelectInput } from "@/components/ui/fields"
@@ -22,7 +23,7 @@ const suggestions: { text: string; hint: string; icon: LucideIcon }[] = [
 const subscribe = () => () => {}
 export function ProjectChat() {
   const hydrated = useSyncExternalStore(subscribe, () => true, () => false)
-  return hydrated ? <ChatSession /> : <PageSkeleton />
+  return hydrated ? <ChatSession /> : <PageSkeleton variant="chat" />
 }
 function ChatSession() {
   const state = useDeployState()
@@ -50,7 +51,8 @@ function ChatSession() {
   }, [])
   const log = useRef<HTMLDivElement>(null)
   useEffect(()=>{try {localStorage.setItem(KEY,JSON.stringify(messages))}catch{/* Chat remains usable without storage. */} log.current?.scrollTo({top:log.current.scrollHeight})},[messages])
-  if(!state) return <PageSkeleton />
+  if(!state) return <PageSkeleton variant="chat" />
+  const initials = state.settings.displayName.split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]?.toUpperCase()).join('') || 'U'
   function send(text: string) {
     if(!text.trim() || !state) return
     const reply=answerProjectQuestion(state,text,projectId,now)
@@ -82,9 +84,10 @@ function ChatSession() {
           {m.role==='assistant' ? <span className="chat-avatar chat-avatar-sm" aria-hidden><Sparkle /></span> : null}
           <div className="chat-bubble">
             <p className="chat-message-author">{m.role==='assistant' ? ASSISTANT : 'You'}</p>
-            <p className="whitespace-pre-line">{m.text}</p>
+            {m.role==='assistant' ? <ReplyBody text={m.text} /> : <p className="whitespace-pre-line">{m.text}</p>}
             {m.links && m.links.length ? <div className="chat-result-links">{m.links.map(l=><Link key={l.href} href={l.href}>{l.label}<ArrowUpRight size={13}/></Link>)}</div> : null}
           </div>
+          {m.role==='user' ? <span className="chat-user-avatar" aria-hidden>{initials}</span> : null}
         </article>)}
       </div>
     </div>
@@ -104,4 +107,19 @@ function ChatSession() {
       <p className="chat-disclaimer">{ASSISTANT} reads local workspace data only · No external AI connection · Infrastructure is simulated</p>
     </div>
   </div>
+}
+
+function ReplyBody({ text }: { text: string }) {
+  return <div className="chat-reply">{formatReply(text).map((block, index) => {
+    if (block.kind === 'items') return <ul key={index} className="chat-reply-items">{block.items.map((item, itemIndex) => <li key={itemIndex}>
+      <div className="chat-reply-row"><strong>{item.title}</strong>{item.status ? <span className="chat-reply-status" data-tone={item.tone}>{statusLabel(item.status)}</span> : null}</div>
+      {item.detail ? <p>{item.detail}</p> : null}
+    </li>)}</ul>
+    if (block.kind === 'note') return <p key={index} className="chat-reply-note"><Info aria-hidden />{block.text}</p>
+    return <p key={index} className="chat-reply-text">{block.text}</p>
+  })}</div>
+}
+
+function statusLabel(status: string): string {
+  return status.replace(/^dns\b/, "DNS").replace(/^./, (first) => first.toUpperCase())
 }

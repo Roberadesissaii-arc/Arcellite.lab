@@ -30,7 +30,7 @@ export function DomainsView() {
   const [port, setPort] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [remove, setRemove] = useState<string | null>(null)
-  if (!state) return <PageSkeleton />
+  if (!state) return <PageSkeleton variant="cards" />
   const selected = state.projects.find((project) => project.id === projectId) ?? state.projects[0]
 
   const q = search.trim().toLowerCase()

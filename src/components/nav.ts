@@ -85,12 +85,12 @@ export const NAV_GROUPS: { id: string; label: string; items: NavItem[] }[] = [
     label: "Observe",
     items: [
       { href: "/logs", label: "Logs", icon: Terminal, animated: TerminalIcon },
-      { href: "/environment", label: "Environment", icon: KeyRound, animated: KeySquareIcon },
-      { href: "/jobs", label: "Jobs", icon: Workflow, animated: WorkflowIcon },
+      { href: "/metrics", label: "Metrics", icon: Gauge, animated: GaugeIcon },
+      { href: "/pipelines", label: "Pipelines", icon: Workflow, animated: WorkflowIcon },
       { href: "/alerts", label: "Alerts", icon: ShieldCheck, animated: ShieldCheckIcon },
       { href: "/events", label: "Events", icon: GalleryVerticalEnd, animated: GalleryVerticalEndIcon },
-      { href: "/metrics", label: "Metrics", icon: Gauge, animated: GaugeIcon },
       { href: "/activity", label: "Activity", icon: MonitorDot, animated: ActivityIcon },
+      { href: "/environment", label: "Environment", icon: KeyRound, animated: KeySquareIcon },
     ],
   },
 ]
