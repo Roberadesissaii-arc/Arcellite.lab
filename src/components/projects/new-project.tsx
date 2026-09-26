@@ -4,8 +4,9 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useForm, useWatch } from "react-hook-form"
 import { z } from "zod"
-import { ArrowRight, Check, Container, GitBranch, Layers, Rocket, Upload } from "lucide-react"
-import { IconTile, SectionHeading, Tag } from "@/components/ui/kit"
+import { ArrowRight, Check, Container, GitBranch, Globe2, Hammer, Layers, Rocket, ScanSearch, Server as ServerIcon, SlidersHorizontal, Upload } from "lucide-react"
+import { ServerStatusView } from "@/components/ui/status"
+import { IconTile, SectionHeading, SegmentMeter, Tag } from "@/components/ui/kit"
 import { GitHubMark } from "@/components/brand"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
@@ -22,8 +23,8 @@ import {
   FRAMEWORKS,
   FRAMEWORK_ORDER,
 } from "@/lib/deploy/detect"
-import { formatBytes } from "@/lib/deploy/format"
-import { nextFreePort, portTaken } from "@/lib/deploy/helpers"
+import { formatBytes, formatGb } from "@/lib/deploy/format"
+import { homeServer, nextFreePort, portTaken } from "@/lib/deploy/helpers"
 import { useDeploy, useDeployState } from "@/lib/deploy/react"
 import { useReducedMotion } from "motion/react"
 import { DeployError, type AnalysisResult, type EnvironmentVariable, type Framework, type GitRepository, type ProjectSource } from "@/lib/deploy/types"
@@ -246,10 +247,11 @@ export function NewProjectView() {
     }
   }
 
+  const target = homeServer(state)
   const imported = repo?.importedProjectId ? state.projects.find((project) => project.id === repo.importedProjectId) : null
 
   return (
-    <div className="page new-project-page">
+    <div className={stage === "choose" ? "page new-project-page np-wide" : "page new-project-page"}>
       <ol className="np-steps" aria-label="Progress">
         {STEPS.map((step, index) => {
           const current = STEPS.findIndex((item) => item.stages.includes(stage))
@@ -295,6 +297,22 @@ export function NewProjectView() {
                 </ul>
                 <span className="np-card-cta">Upload files<ArrowRight aria-hidden /></span>
               </button>
+              <div className="np-target">
+                <span className="np-card-head">
+                  <span className="np-card-icon"><ServerIcon aria-hidden /></span>
+                  {target ? <ServerStatusView value={target.status} /> : null}
+                </span>
+                <strong>Deploys to {target?.name ?? "your server"}</strong>
+                <small>{target ? `${target.os} · ${target.ip}` : "Connect a server to deploy."}</small>
+                {target ? (
+                  <dl className="np-target-grid">
+                    <div><dt>Free memory</dt><dd>{formatGb(target.memoryTotalGb - target.memoryUsedGb)}</dd><SegmentMeter value={(target.memoryUsedGb / target.memoryTotalGb) * 100} label="Memory used" /></div>
+                    <div><dt>Free disk</dt><dd>{formatGb(target.storageTotalGb - target.storageUsedGb)}</dd><SegmentMeter value={(target.storageUsedGb / target.storageTotalGb) * 100} label="Disk used" /></div>
+                    <div className="np-target-row"><dt>Next port</dt><dd><code className="table-code">{nextFreePort(state.projects, state.settings.portStart)}</code></dd></div>
+                    <div className="np-target-row"><dt>Branch</dt><dd><code className="table-code">{state.settings.defaultBranch}</code></dd></div>
+                  </dl>
+                ) : null}
+              </div>
             </div>
           </section>
           <section className="mt-8">
@@ -312,6 +330,24 @@ export function NewProjectView() {
                 </button>
               ))}
             </div>
+          </section>
+          <section className="mt-8">
+            <SectionHeading title="How a deploy works" />
+            <ol className="np-flow">
+              {([
+                [ScanSearch, "Detect", "Reads package files to find the framework, build, and start commands."],
+                [SlidersHorizontal, "Configure", "Review ports, environment variables, and resources before anything runs."],
+                [Hammer, "Build", "Installs dependencies and builds an image on your server."],
+                [Globe2, "Go live", "Starts the container, checks health, and gives you a local URL."],
+              ] as const).map(([Icon, title, body], index) => (
+                <li key={title}>
+                  <span className="np-flow-num">{index + 1}</span>
+                  <IconTile icon={Icon} tone="brand" />
+                  <strong>{title}</strong>
+                  <small>{body}</small>
+                </li>
+              ))}
+            </ol>
           </section>
           <section className="np-frameworks">
             <p>Detected automatically</p>

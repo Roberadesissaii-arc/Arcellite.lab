@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { copyText, PageSkeleton } from "@/components/ui/bits"
 import { Field, SelectInput, TextInput } from "@/components/ui/fields"
-import { EmptyPanel, IconTile, SearchField, SectionHeading, StatCard, StatGrid, Tag } from "@/components/ui/kit"
+import { EmptyPanel, IconTile, SearchField, SectionHeading, SegmentMeter, StatCard, StatGrid, Tag } from "@/components/ui/kit"
 import { ConfirmDialog, Modal } from "@/components/ui/overlays"
 import { useToast } from "@/components/ui/toast"
 import { envError } from "@/components/projects/env-editor"
@@ -86,28 +86,36 @@ export function EnvironmentView() {
       {state.projects.length === 0 ? (
         <EmptyPanel icon={KeyRound} title="No projects yet" body="Create a project to give it environment variables." action={<Link href="/projects/new" className="btn btn-primary">New project</Link>} />
       ) : (
-        <div className="env-layout">
+        <div className="page-stack">
           <section>
             <SectionHeading title="Projects" count={state.projects.length} />
-            <ul className="env-projects">
-              {state.projects.map((item) => (
-                <li key={item.id}>
-                  <button type="button" className="pressable" aria-current={item.id === project?.id} onClick={() => { setPicked(item.id); setRevealed({}) }}>
-                    <IconTile icon={FolderKanban} tone={item.id === project?.id ? "brand" : "neutral"} size="sm" />
-                    <span className="min-w-0 flex-1"><strong>{item.name}</strong><small className="capitalize">{item.environment}</small></span>
-                    <span className="section-count">{item.env.length}</span>
-                  </button>
-                </li>
-              ))}
+            <ul className="env-project-cards">
+              {state.projects.map((item) => {
+                const secretCount = item.env.filter((variable) => variable.secret).length
+                const selected = item.id === project?.id
+                return (
+                  <li key={item.id}>
+                    <button type="button" className="env-project-card pressable" aria-current={selected} onClick={() => { setPicked(item.id); setRevealed({}) }}>
+                      <span className="env-project-head">
+                        <IconTile icon={FolderKanban} tone={selected ? "brand" : "neutral"} />
+                        <span className="min-w-0 flex-1"><strong>{item.name}</strong><small className="capitalize">{item.environment}</small></span>
+                        {selected ? <Tag tone="brand">Selected</Tag> : null}
+                      </span>
+                      <span className="env-project-stats">
+                        <span><b>{item.env.length}</b> variables</span>
+                        <span><b>{secretCount}</b> secret{secretCount === 1 ? "" : "s"}</span>
+                        <span><b>{new Set(item.env.map((variable) => variable.scope)).size}</b> scopes</span>
+                      </span>
+                      <SegmentMeter value={item.env.length ? (secretCount / item.env.length) * 100 : 0} label={`${item.name} share of secret variables`} />
+                    </button>
+                  </li>
+                )
+              })}
             </ul>
-            <div className="env-note">
-              <ShieldCheck aria-hidden />
-              <p><strong>How secrets are handled.</strong> Values are written to the container at start and never into the image or build log. In Phase 1 they are stored in this browser only.</p>
-            </div>
           </section>
 
           {project ? (
-            <section className="min-w-0">
+            <section className="min-w-0 env-detail">
               <SectionHeading title={project.name} count={rows.length} aside={<Link href={`/projects/${project.id}/environment`} className="inline-flex items-center gap-1 text-xs text-muted hover:text-[var(--brand-primary)]">Project settings<ArrowUpRight size={13} aria-hidden /></Link>} />
               <div className="page-toolbar">
                 <SearchField value={search} onChange={setSearch} placeholder="Search keys" label="Search variables" />
@@ -148,6 +156,12 @@ export function EnvironmentView() {
               </div>
             </section>
           ) : null}
+
+          <section className="env-security" aria-label="How secrets are handled">
+            <div><ShieldCheck aria-hidden /><p><strong>Never in the image.</strong> Values are written to the container when it starts, not baked into the build.</p></div>
+            <div><EyeOff aria-hidden /><p><strong>Masked by default.</strong> Secrets stay hidden here and are redacted from logs.</p></div>
+            <div><Lock aria-hidden /><p><strong>Local in Phase 1.</strong> Everything is stored in this browser until the server agent ships.</p></div>
+          </section>
         </div>
       )}
 
