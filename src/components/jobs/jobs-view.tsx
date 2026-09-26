@@ -1,6 +1,6 @@
 "use client"
 
-import { BriefcaseBusiness, CircleAlert, CircleCheck, Hammer, Loader } from "lucide-react"
+import { Workflow, CircleAlert, CircleCheck, Hammer, Loader } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 import { PageSkeleton } from "@/components/ui/bits"
 import { EmptyPanel, ItemList, ItemRow, SectionHeading, StatCard, StatGrid, deploymentTone } from "@/components/ui/kit"
@@ -24,7 +24,7 @@ export function JobsView() {
   const avg = finished.length ? finished.reduce((sum, job) => sum + (Date.parse(job.finishedAt!) - Date.parse(job.createdAt)), 0) / finished.length : 0
   return (
     <div className="page page-stack">
-      <PageHeader icon={BriefcaseBusiness} kicker="Observe" title="Jobs" description="Build and deploy work on this server — each deployment runs as one job through the pipeline." />
+      <PageHeader icon={Workflow} kicker="Observe" title="Jobs" description="Build and deploy work on this server — each deployment runs as one job through the pipeline." />
       <StatGrid>
         <StatCard icon={Loader} tone="brand" label="Active" value={active.length} detail={active.length ? "Running now" : "Queue is empty"} />
         <StatCard icon={CircleCheck} tone="success" label="Succeeded" value={done} detail="Completed every step" />
@@ -34,7 +34,7 @@ export function JobsView() {
       <section>
         <SectionHeading title="Job history" count={jobs.length} />
         {jobs.length === 0 ? (
-          <EmptyPanel icon={BriefcaseBusiness} title="No jobs" body="A deployment starts a job." />
+          <EmptyPanel icon={Workflow} title="No jobs" body="A deployment starts a job." />
         ) : (
           <ItemList label="Jobs">
             {jobs.map((job) => {

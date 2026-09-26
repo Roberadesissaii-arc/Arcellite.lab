@@ -337,6 +337,14 @@ export interface Settings {
   redactSecrets: boolean
   workspaceName: string
   displayName: string
+  timezone: string
+  notifyDeploySuccess: boolean
+  notifyDeployFailure: boolean
+  notifyDomains: boolean
+  notifyServer: boolean
+  logRetentionDays: number
+  buildConcurrency: number
+  autoRollback: boolean
 }
 
 export interface AppState {

@@ -2,10 +2,11 @@
 
 import * as Tooltip from "@radix-ui/react-tooltip"
 import { ChevronLeft, ChevronRight, ChevronsUpDown, Server, Minus, Code2, HelpCircle, LogOut, UserCog } from "lucide-react"
-import { NAV_GROUPS, DOCS_ITEM, SETTINGS_ITEM, NOTIFICATIONS_ITEM, isNavActive, type NavItem } from "@/components/nav"
+import { NAV_GROUPS, DOCS_ITEM, SETTINGS_ITEM, NOTIFICATIONS_ITEM, isNavActive, type AnimatedIconHandle, type NavItem } from "@/components/nav"
+import { useReducedMotion } from "motion/react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { useSyncExternalStore } from "react"
+import { useRef, useSyncExternalStore } from "react"
 import { ArcelliteMark } from "@/components/brand"
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/overlays"
 import { useToast } from "@/components/ui/toast"
@@ -48,14 +49,22 @@ function SidebarTooltip({ label, enabled, children }: { label: string; enabled: 
   </Tooltip.Portal></Tooltip.Root>
 }
 
-function FlatLink({ label, icon: Icon, href, count, collapsed, pathname, onNavigate, nested }: NavItem & {
+function FlatLink({ label, icon: Icon, animated: Animated, href, count, collapsed, pathname, onNavigate, nested }: NavItem & {
   nested?: boolean; count?: number; collapsed: boolean; pathname: string; onNavigate?: () => void
 }) {
+  const iconRef = useRef<AnimatedIconHandle>(null)
+  const reduced = useReducedMotion()
+  const showIcon = !nested || collapsed
+  const play = Animated && showIcon && !reduced
   return <SidebarTooltip label={label} enabled={collapsed}>
     <Link href={href} onClick={onNavigate} aria-label={label}
       aria-current={isNavActive(pathname, href) ? "page" : undefined}
-      className="sidebar-link" data-nested={nested} data-collapsed={collapsed}>
-      {(!nested || collapsed) && <Icon aria-hidden />}
+      className="sidebar-link" data-nested={nested} data-collapsed={collapsed}
+      onMouseEnter={play ? () => iconRef.current?.startAnimation() : undefined}
+      onMouseLeave={play ? () => iconRef.current?.stopAnimation() : undefined}
+      onFocus={play ? () => iconRef.current?.startAnimation() : undefined}
+      onBlur={play ? () => iconRef.current?.stopAnimation() : undefined}>
+      {showIcon && (play ? <Animated ref={iconRef} size={15} className="sidebar-animated-icon" aria-hidden /> : <Icon aria-hidden />)}
       {!collapsed && <><span className="min-w-0 flex-1 truncate">{label}</span>
         {count !== undefined && <span className="sidebar-count">{count}</span>}</>}
     </Link>

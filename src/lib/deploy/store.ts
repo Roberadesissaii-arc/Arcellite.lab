@@ -81,7 +81,9 @@ function readStorage(): AppState | null {
     const raw = window.localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     const parsed: unknown = JSON.parse(raw)
-    return isState(parsed) ? parsed : null
+    if (!isState(parsed)) return null
+    // Settings added after a browser first saved state fall back to defaults.
+    return { ...parsed, settings: { ...serverSnapshot.settings, ...parsed.settings } }
   } catch {
     return null
   }
