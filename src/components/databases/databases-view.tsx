@@ -4,6 +4,8 @@ import { useState } from "react"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { copyText, PageSkeleton } from "@/components/ui/bits"
+import { EmptyPanel, IconTile, SectionHeading, StatCard, StatGrid, Tag } from "@/components/ui/kit"
+import { CirclePlay, Database, HardDrive, KeyRound, Zap } from "lucide-react"
 import { Modal } from "@/components/ui/overlays"
 import { useToast } from "@/components/ui/toast"
 import { useDeployState } from "@/lib/deploy/react"
@@ -22,22 +24,43 @@ export function DatabasesView() {
   const [revealed, setRevealed] = useState(false)
   if (!state) return <PageSkeleton />
   const selected = state.databases.find((database) => database.id === id) ?? null
+  const running = state.databases.filter((database) => database.status === "running").length
+  const storage = Math.round(state.databases.reduce((sum, database) => sum + database.storageGb, 0) * 10) / 10
+  const engines = new Set(state.databases.map((database) => database.engine)).size
   return (
-    <div className="page">
-      <PageHeader title="Databases" description="Data services running beside your applications. Credentials stay hidden until you reveal them." />
-      <ul className="panel resource-list mt-6">
-        {state.databases.map((database) => (
-          <li key={database.id}>
-            <button type="button" className="resource-button database-row w-full px-4 py-4 text-left" onClick={() => { setRevealed(false); setId(database.id) }}>
-              <span className="block font-medium">{database.name}</span>
-              <span className="text-sm text-muted">{ENGINE[database.engine]} {database.version}</span>
-              <span className="mt-1 block text-sm">{database.status === "running" ? "Running" : "Stopped"}</span>
-              <span className="mt-2 block font-mono text-sm text-muted">{connection(database, false)}</span>
-              <span className="mt-1 block text-sm text-faint">{database.storageGb} GB</span>
-            </button>
-          </li>
-        ))}
-      </ul>
+    <div className="page page-stack">
+      <PageHeader icon={Database} kicker="Infrastructure" title="Databases" description="Data services running beside your applications. Credentials stay hidden until you reveal them." />
+      <StatGrid>
+        <StatCard icon={Database} tone="brand" label="Services" value={state.databases.length} detail={`${engines} engine${engines === 1 ? "" : "s"}`} />
+        <StatCard icon={CirclePlay} tone="success" label="Running" value={running} detail={running === state.databases.length ? "All services up" : "Some services stopped"} />
+        <StatCard icon={HardDrive} tone="info" label="Storage" value={<>{storage}<small> GB</small></>} detail="Across data volumes" />
+        <StatCard icon={KeyRound} tone="neutral" label="Credentials" value={state.databases.filter((database) => database.password).length} detail="Hidden by default" />
+      </StatGrid>
+      <section>
+        <SectionHeading title="Services" count={state.databases.length} />
+        {state.databases.length === 0 ? <EmptyPanel icon={Database} title="No databases" body="Data services you add will appear here." /> : (
+          <div className="card-grid">
+            {state.databases.map((database) => {
+              const project = state.projects.find((item) => item.id === database.projectId)
+              return (
+                <button key={database.id} type="button" className="card pressable" data-interactive onClick={() => { setRevealed(false); setId(database.id) }}>
+                  <span className="card-head">
+                    <IconTile icon={database.engine === "redis" ? Zap : Database} tone={database.engine === "redis" ? "danger" : database.engine === "mysql" ? "info" : "brand"} />
+                    <span className="min-w-0"><span className="card-title block">{database.name}</span><span className="card-sub block">{ENGINE[database.engine]} {database.version}</span></span>
+                    <Tag tone={database.status === "running" ? "success" : "warning"}>{database.status === "running" ? "Running" : "Stopped"}</Tag>
+                  </span>
+                  <code className="code-chip">{connection(database, false)}</code>
+                  <dl className="card-rows">
+                    <div><dt>Project</dt><dd>{project?.name ?? "Shared"}</dd></div>
+                    <div><dt>Host</dt><dd className="font-mono text-[11px]">{database.host}:{database.port}</dd></div>
+                    <div><dt>Storage</dt><dd>{database.storageGb} GB</dd></div>
+                  </dl>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </section>
       <Modal
         open={Boolean(selected)}
         onOpenChange={(open) => { if (!open) { setId(null); setRevealed(false) } }}

@@ -2,16 +2,21 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react"
 import Link from "next/link"
-import { ArrowUp, ArrowUpRight, Sparkle, Trash2 } from "lucide-react"
+import { Activity, ArrowUp, ArrowUpRight, Globe2, Layers, Server, Sparkle, Trash2, TriangleAlert, type LucideIcon } from "lucide-react"
 import { useDeployState } from "@/lib/deploy/react"
 import { answerProjectQuestion, type AssistantReply } from "@/lib/deploy/assistant"
 import { useNow } from "@/lib/use-now"
 import { PageSkeleton } from "@/components/ui/bits"
-import { PageHeader } from "@/components/page-header"
 
 type Message = { role: "user" | "assistant"; text: string; links?: AssistantReply['links'] }
 const KEY = 'arcellite-project-chat-v1'
-const suggestions = ['What is running right now?', 'What needs attention?', 'Check server resources', 'Check my domains']
+const ASSISTANT = 'Arc'
+const suggestions: { text: string; hint: string; icon: LucideIcon }[] = [
+  { text: 'What is running right now?', hint: 'Deployments and containers', icon: Activity },
+  { text: 'What needs attention?', hint: 'Failures and warnings', icon: TriangleAlert },
+  { text: 'Check server resources', hint: 'CPU, memory, and storage', icon: Server },
+  { text: 'Check my domains', hint: 'DNS and certificates', icon: Globe2 },
+]
 
 const subscribe = () => () => {}
 export function ProjectChat() {
@@ -52,16 +57,51 @@ function ChatSession() {
     setQuestion('')
   }
   return <div className="page project-chat-page">
-    <PageHeader
-      kicker="Workspace assistant"
-      title="Project chat"
-      actions={<span className="local-assistant-badge"><span />Local · Phase 1</span>}
-    />
-    <div className="chat-toolbar"><label htmlFor="chat-project">Context</label><select id="chat-project" className="select" value={projectId} onChange={e=>setProjectId(e.target.value)}><option value="all">All projects</option>{state.projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select><button type="button" className="btn btn-ghost" disabled={!messages.length} onClick={()=>setMessages([])}><Trash2 size={14}/>Clear chat</button></div>
-    <div ref={log} className="chat-conversation" role="log" aria-label="Project conversation" aria-live="polite">
-      {!messages.length ? <div className="chat-welcome"><div className="chat-welcome-copy"><span className="chat-welcome-mark"><Sparkle /></span><h2>Know what’s happening.<br/><span>Keep your projects moving.</span></h2><p>Ask about deployments, containers, and the health of your workspace. Answers use your current local project data.</p></div><div className="chat-suggestions">{suggestions.map(s=><button key={s} type="button" onClick={()=>send(s)}>{s}<ArrowUpRight size={14}/></button>)}</div></div> : messages.map((m,i)=><article key={i} className={`chat-message chat-message-${m.role}`}><p className="chat-message-author">{m.role==='assistant' ? <><Sparkle size={14}/>Project assistant</> : 'You'}</p><p className="whitespace-pre-line">{m.text}</p>{m.links && <div className="chat-result-links">{m.links.map(l=><Link key={l.href} href={l.href}>{l.label}<ArrowUpRight size={13}/></Link>)}</div>}</article>)}
+    <header className="chat-topbar">
+      <span className="chat-avatar" aria-hidden><Sparkle /></span>
+      <div className="min-w-0">
+        <h1>Ask {ASSISTANT}</h1>
+        <p><span className="chat-live-dot" />Workspace assistant · Local, Phase 1</p>
+      </div>
+      <button type="button" className="btn btn-ghost btn-sm chat-clear" disabled={!messages.length} onClick={()=>setMessages([])}><Trash2 aria-hidden /><span>Clear</span></button>
+    </header>
+
+    <div ref={log} className="chat-conversation" role="log" aria-label={`Conversation with ${ASSISTANT}`} aria-live="polite">
+      <div className="chat-column">
+        {!messages.length ? <div className="chat-welcome">
+          <span className="chat-welcome-mark"><Sparkle /></span>
+          <h2>Know what’s happening.<span>Keep your projects moving.</span></h2>
+          <p>Ask {ASSISTANT} about deployments, containers, and the health of your workspace. Answers use your current local project data.</p>
+          <div className="chat-suggestions">{suggestions.map(({ text, hint, icon: Icon })=><button key={text} type="button" className="pressable" onClick={()=>send(text)}>
+            <span className="chat-suggestion-icon"><Icon aria-hidden /></span>
+            <span className="min-w-0 flex-1"><strong>{text}</strong><small>{hint}</small></span>
+            <ArrowUpRight aria-hidden className="chat-suggestion-arrow" />
+          </button>)}</div>
+        </div> : messages.map((m,i)=><article key={i} className={`chat-message chat-message-${m.role}`}>
+          {m.role==='assistant' ? <span className="chat-avatar chat-avatar-sm" aria-hidden><Sparkle /></span> : null}
+          <div className="chat-bubble">
+            <p className="chat-message-author">{m.role==='assistant' ? ASSISTANT : 'You'}</p>
+            <p className="whitespace-pre-line">{m.text}</p>
+            {m.links && m.links.length ? <div className="chat-result-links">{m.links.map(l=><Link key={l.href} href={l.href}>{l.label}<ArrowUpRight size={13}/></Link>)}</div> : null}
+          </div>
+        </article>)}
+      </div>
     </div>
-    <form className="chat-composer" onSubmit={e=>{e.preventDefault();send(question)}}><label className="sr-only" htmlFor="project-question">Ask about your projects</label><input id="project-question" value={question} maxLength={1000} onChange={e=>setQuestion(e.target.value)} placeholder="Ask about your projects…" autoComplete="off"/><button type="submit" className="btn btn-primary" aria-label="Send question" disabled={!question.trim()}><ArrowUp size={18}/></button></form>
-    <p className="chat-disclaimer">Local status assistant · No external AI connection · Infrastructure is simulated</p>
+
+    <div className="chat-dock">
+      <form className="chat-composer" onSubmit={e=>{e.preventDefault();send(question)}}>
+        <label className="sr-only" htmlFor="project-question">Ask {ASSISTANT} about your projects</label>
+        <textarea id="project-question" rows={1} value={question} maxLength={1000} onChange={e=>setQuestion(e.target.value)} onKeyDown={e=>{ if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(question) } }} placeholder={`Ask ${ASSISTANT} about your projects…`} autoComplete="off"/>
+        <div className="chat-composer-bar">
+          <label className="chat-context">
+            <Layers aria-hidden />
+            <span className="sr-only">Context</span>
+            <select value={projectId} onChange={e=>setProjectId(e.target.value)}><option value="all">All projects</option>{state.projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>
+          </label>
+          <button type="submit" className="btn btn-primary chat-send pressable" aria-label="Send question" disabled={!question.trim()}><ArrowUp aria-hidden/></button>
+        </div>
+      </form>
+      <p className="chat-disclaimer">{ASSISTANT} reads local workspace data only · No external AI connection · Infrastructure is simulated</p>
+    </div>
   </div>
 }

@@ -1,47 +1,47 @@
 "use client"
 
-import Link from "next/link"
 import { useState } from "react"
+import { MonitorDot } from "lucide-react"
+import { ActivityTimeline } from "@/components/activity/timeline"
 import { PageHeader } from "@/components/page-header"
-import { EmptyState, PageSkeleton } from "@/components/ui/bits"
-import { SelectInput } from "@/components/ui/fields"
-import { formatDateTime } from "@/lib/deploy/format"
+import { PageSkeleton } from "@/components/ui/bits"
+import { EmptyPanel, SectionHeading } from "@/components/ui/kit"
 import { useDeployState } from "@/lib/deploy/react"
+import { useNow } from "@/lib/use-now"
+
+const FILTERS = [
+  { value: "all", label: "All" },
+  { value: "success", label: "Success" },
+  { value: "info", label: "Info" },
+  { value: "warning", label: "Warning" },
+  { value: "error", label: "Error" },
+] as const
 
 export function ActivityView() {
   const state = useDeployState()
-  const [result, setResult] = useState("all")
+  const now = useNow()
+  const [result, setResult] = useState<(typeof FILTERS)[number]["value"]>("all")
   if (!state) return <PageSkeleton />
   const rows = state.activity.filter((event) => result === "all" || event.result === result)
   return (
-    <div className="page">
-      <PageHeader title="Activity" description="What changed in this workspace, and who did it." />
-      <div className="mt-6 max-w-[200px]">
-        <SelectInput aria-label="Result" value={result} onChange={(event) => setResult(event.target.value)}>
-          <option value="all">All results</option>
-          <option value="success">Success</option>
-          <option value="info">Info</option>
-          <option value="warning">Warning</option>
-          <option value="error">Error</option>
-        </SelectInput>
-      </div>
-      {rows.length === 0 ? <EmptyState title="No activity" body="Actions you take in this workspace will show up here." /> : (
-        <ol className="panel resource-list mt-6">
-          {rows.map((event) => (
-            <li key={event.id} className="grid gap-3 px-4 py-4 sm:grid-cols-[160px_1fr]">
-              <time className="text-sm text-faint" dateTime={event.timestamp}>{formatDateTime(event.timestamp)}</time>
-              <div>
-                <p>
-                  <span className="font-medium">{event.action}</span>
-                  <span className="text-muted"> · {event.objectType} · </span>
-                  {event.href ? <Link href={event.href} className="underline underline-offset-4">{event.objectName}</Link> : event.objectName}
-                </p>
-                <p className="text-sm text-muted">{event.actor} · {event.result}{event.detail ? ` · ${event.detail}` : ""}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-      )}
+    <div className="page page-stack">
+      <PageHeader icon={MonitorDot} kicker="Observe" title="Activity" description="What changed in this workspace, and who did it." />
+      <section>
+        <SectionHeading title="Audit log" count={rows.length} />
+        <div className="page-toolbar">
+          <div className="segmented" role="group" aria-label="Filter by result">
+            {FILTERS.map((item) => (
+              <button key={item.value} type="button" aria-pressed={result === item.value} onClick={() => setResult(item.value)}>
+                {item.label}
+                <span className="ml-1.5 text-[10px] text-faint tabular-nums">{item.value === "all" ? state.activity.length : state.activity.filter((event) => event.result === item.value).length}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="mt-3">
+          {rows.length === 0 ? <EmptyPanel icon={MonitorDot} title="No activity" body="Actions you take in this workspace will show up here." /> : <ActivityTimeline events={rows} now={now} showActor />}
+        </div>
+      </section>
     </div>
   )
 }

@@ -5,8 +5,9 @@ import { useCallback, useMemo, useState } from "react"
 import { PageHeader } from "@/components/page-header"
 import { mapProjectsToTableRows, ProjectsTable } from "@/components/projects/projects-table"
 import { Button } from "@/components/ui/button"
-import { copyText, EmptyState, PageSkeleton } from "@/components/ui/bits"
-import { SelectInput, TextInput } from "@/components/ui/fields"
+import { copyText, PageSkeleton } from "@/components/ui/bits"
+import { EmptyPanel, SearchField, SectionHeading, StatCard, StatGrid } from "@/components/ui/kit"
+import { SelectInput } from "@/components/ui/fields"
 import { ConfirmDialog } from "@/components/ui/overlays"
 import { useToast } from "@/components/ui/toast"
 import { filterProjects, type ProjectSort } from "@/lib/deploy/filters"
@@ -14,7 +15,8 @@ import { DeployError } from "@/lib/deploy/types"
 import { latestDeployment, projectBadge } from "@/lib/deploy/helpers"
 import { useDeploy, useDeployState } from "@/lib/deploy/react"
 import { useNow } from "@/lib/use-now"
-import type { DeploymentStatus, EnvironmentName, Project } from "@/lib/deploy/types"
+import type { AppState, DeploymentStatus, EnvironmentName, Project } from "@/lib/deploy/types"
+import { CircleAlert, CircleCheck, FolderKanban, Globe2, Plus, SearchX } from "lucide-react"
 
 export function ProjectsView() {
   const state = useDeployState()
@@ -79,19 +81,23 @@ export function ProjectsView() {
   if (!state) return <PageSkeleton />
 
   return (
-    <div className="page page-wide">
+    <div className="page page-wide page-stack">
       <PageHeader
+        icon={FolderKanban}
         kicker="Workspace"
         title="Projects"
         description="Applications deployed to this server — from first commit to production."
         actions={
           <Button variant="primary" onClick={() => router.push("/projects/new")}>
-            New project
+            <Plus aria-hidden />New project
           </Button>
         }
       />
+      <ProjectStats state={state} />
+      <section>
+      <SectionHeading title="All projects" count={state.projects.length} />
       <div className="filter-toolbar">
-        <TextInput value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search projects" aria-label="Search projects" />
+        <SearchField value={search} onChange={setSearch} placeholder="Search projects" label="Search projects" />
         <SelectInput aria-label="Environment" value={environment} onChange={(event) => setEnvironment(event.target.value as EnvironmentName | "all")}>
           <option value="all">All environments</option>
           <option value="production">Production</option>
@@ -114,7 +120,8 @@ export function ProjectsView() {
       </div>
       <div className="projects-list-wrap">
         {state.projects.length === 0 ? (
-          <EmptyState
+          <EmptyPanel
+            icon={FolderKanban}
             title="No projects yet"
             body="Deploy your first application from GitHub or upload a project."
             action={
@@ -124,7 +131,7 @@ export function ProjectsView() {
             }
           />
         ) : rows.length === 0 ? (
-          <EmptyState title="No projects match" body="Try a different name, environment, or status." />
+          <EmptyPanel icon={SearchX} title="No projects match" body="Try a different name, environment, or status." />
         ) : (
           <ProjectsTable
             rows={tableRows}
@@ -138,6 +145,7 @@ export function ProjectsView() {
           />
         )}
       </div>
+      </section>
       <ConfirmDialog
         open={Boolean(pendingDelete)}
         title={pendingDelete ? `Delete ${pendingDelete.name}?` : "Delete project?"}
@@ -156,5 +164,21 @@ export function ProjectsView() {
         }}
       />
     </div>
+  )
+}
+
+function ProjectStats({ state }: { state: AppState }) {
+  const now = useNow()
+  const badges = state.projects.map((project) => projectBadge(project, latestDeployment(state.deployments, project.id, now)))
+  const ready = badges.filter((badge) => badge === "ready").length
+  const failed = badges.filter((badge) => badge === "failed").length
+  const production = state.projects.filter((project) => project.environment === "production").length
+  return (
+    <StatGrid>
+      <StatCard icon={FolderKanban} tone="brand" label="Projects" value={state.projects.length} detail={`${production} in production`} />
+      <StatCard icon={CircleCheck} tone="success" label="Ready to serve" value={ready} detail="Latest release is live" />
+      <StatCard icon={CircleAlert} tone={failed ? "danger" : "neutral"} label="Failing" value={failed} detail={failed ? "Latest release failed" : "No failing projects"} />
+      <StatCard icon={Globe2} tone="info" label="Domains" value={state.domains.length} href="/domains" detail="Attached hostnames" />
+    </StatGrid>
   )
 }

@@ -5,15 +5,17 @@ import { useState } from "react"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { PageSkeleton } from "@/components/ui/bits"
+import { EmptyPanel, ItemList, ItemRow, SectionHeading, StatCard, StatGrid } from "@/components/ui/kit"
 import { SelectInput } from "@/components/ui/fields"
 import { Modal, ConfirmDialog } from "@/components/ui/overlays"
 import { ContainerStatusView } from "@/components/ui/status"
 import { useToast } from "@/components/ui/toast"
-import { formatUptime } from "@/lib/deploy/format"
+import { formatUptime, plural } from "@/lib/deploy/format"
 import { useDeploy, useDeployState } from "@/lib/deploy/react"
 import { DeployError, type Container } from "@/lib/deploy/types"
 import { useNow } from "@/lib/use-now"
 import Link from "next/link"
+import { Box, Boxes, CirclePlay, Cog, Cpu, Database, MemoryStick } from "lucide-react"
 
 export function ContainersView() {
   const state = useDeployState()
@@ -42,35 +44,58 @@ export function ContainersView() {
     }
   }
 
+  const running = state.containers.filter((container) => container.state === "running").length
+  const idle = state.containers.length - running
+  const cpu = rows.reduce((sum, container) => sum + container.cpuPercent, 0)
+  const memory = rows.reduce((sum, container) => sum + container.memoryMb, 0)
+
   return (
-    <div className="page page-wide">
-      <PageHeader title="Containers" description="Workloads currently known to the control plane." />
-      <div className="mt-6 max-w-xs">
-        <SelectInput aria-label="Server" value={serverId} onChange={(event) => setServerId(event.target.value)}>
-          <option value="all">All servers</option>
-          {state.servers.map((server) => <option key={server.id} value={server.id}>{server.name}</option>)}
-        </SelectInput>
-      </div>
-      {rows.length === 0 ? <p className="mt-8 text-sm text-muted">No containers on this server.</p> : (
-        <ul className="panel resource-list mt-4">
-            <li className="list-columns container-table-row" aria-hidden="true"><span>Container</span><span>Project</span><span>Image</span><span>State</span><span>Uptime</span><span>Ports</span><span>CPU / RAM</span></li>
-          {rows.map((container) => {
-            const project = state.projects.find((item) => item.id === container.projectId)
-            const port = container.ports.find((item) => item.host)
-            return (
-              <li key={container.id} className="data-row container-table-row">
-                <button type="button" className="text-left font-medium" onClick={() => setPicked(container.id)}>{container.name}</button>
-                <span className="text-sm text-muted">{project?.name ?? "Infrastructure"}</span>
-                <span className="truncate text-sm text-muted">{container.image}</span>
-                <ContainerStatusView value={container.state} />
-                <span className="text-sm tabular-nums text-muted">{formatUptime(container.startedAt, now)}</span>
-                <span className="text-sm text-muted">{port ? `${port.host}:${port.container}` : "internal"}</span>
-                <span className="text-sm tabular-nums text-muted">{container.cpuPercent}% · {container.memoryMb} MB</span>
-              </li>
-            )
-          })}
-        </ul>
-      )}
+    <div className="page page-wide page-stack">
+      <PageHeader icon={Boxes} kicker="Infrastructure" title="Containers" description="Workloads the control plane knows about. Select a container to inspect, stop, or restart it." />
+      <StatGrid>
+        <StatCard icon={Boxes} tone="brand" label="Containers" value={state.containers.length} detail={`Across ${plural(state.servers.length, "server")}`} />
+        <StatCard icon={CirclePlay} tone="success" label="Running" value={running} detail={idle ? `${idle} stopped or exited` : "Everything is up"} />
+        <StatCard icon={Cpu} tone="info" label="CPU in use" value={<>{cpu.toFixed(1)}<small>%</small></>} detail="Sum of shown containers" />
+        <StatCard icon={MemoryStick} tone="neutral" label="Memory in use" value={<>{memory >= 1024 ? (memory / 1024).toFixed(1) : memory}<small>{memory >= 1024 ? " GB" : " MB"}</small></>} detail="Resident set size" />
+      </StatGrid>
+      <section>
+        <SectionHeading title="Workloads" count={rows.length} />
+        <div className="page-toolbar">
+          <SelectInput aria-label="Server" value={serverId} onChange={(event) => setServerId(event.target.value)}>
+            <option value="all">All servers</option>
+            {state.servers.map((server) => <option key={server.id} value={server.id}>{server.name}</option>)}
+          </SelectInput>
+          <span className="toolbar-note">Ports show host → container</span>
+        </div>
+        <div className="mt-3">
+          {rows.length === 0 ? <EmptyPanel icon={Boxes} title="No containers" body="Nothing is running on this server yet." /> : (
+            <ItemList label="Containers">
+              {rows.map((container) => {
+                const project = state.projects.find((item) => item.id === container.projectId)
+                const port = container.ports.find((item) => item.host)
+                return (
+                  <ItemRow
+                    key={container.id}
+                    onClick={() => setPicked(container.id)}
+                    icon={container.role === "data" ? Database : container.role === "worker" ? Cog : Box}
+                    tone={container.state === "running" ? "success" : container.state === "exited" ? "danger" : container.state === "stopped" ? "warning" : "info"}
+                    title={container.name}
+                    subtitle={container.image}
+                    meta={[
+                      <span key="p">{project?.name ?? "Infrastructure"}</span>,
+                      <span key="port" className="font-mono text-[11px]">{port ? `${port.host} → ${port.container}` : "internal"}</span>,
+                      <span key="up" className="text-faint">{formatUptime(container.startedAt, now)}</span>,
+                      <span key="res" className="text-faint">{container.cpuPercent}% · {container.memoryMb} MB</span>,
+                    ]}
+                    metaWidths={[120, 110, 70, 110]}
+                    trailing={<span className="w-[92px]"><ContainerStatusView value={container.state} /></span>}
+                  />
+                )
+              })}
+            </ItemList>
+          )}
+        </div>
+      </section>
       <Modal open={Boolean(selected)} onOpenChange={(open) => { if (!open) setPicked(null) }} title={selected?.name ?? "Container"} description={selected?.image}>
         {selected ? (
           <div className="space-y-3 text-sm">

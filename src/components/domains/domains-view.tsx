@@ -1,9 +1,11 @@
 "use client"
 
 import { useState } from "react"
+import { Clock, Globe2, Lock, Network, Plus, ShieldCheck } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
-import { CopyButton, EmptyState, PageSkeleton } from "@/components/ui/bits"
+import { CopyButton, PageSkeleton } from "@/components/ui/bits"
+import { EmptyPanel, IconTile, ItemList, ItemRow, SectionHeading, StatCard, StatGrid, Tag } from "@/components/ui/kit"
 import { Field, SelectInput, TextInput } from "@/components/ui/fields"
 import { ConfirmDialog, Modal } from "@/components/ui/overlays"
 import { DomainStatusView } from "@/components/ui/status"
@@ -28,61 +30,75 @@ export function DomainsView() {
   if (!state) return <PageSkeleton />
   const selected = state.projects.find((project) => project.id === projectId) ?? state.projects[0]
 
+  const active = state.domains.filter((domain) => domain.status === "active").length
+  const waiting = state.domains.filter((domain) => domain.status !== "active").length
+  const openAdd = () => { setProjectId(state.projects[0]?.id ?? ""); setPort(String(state.projects[0]?.exposedPort ?? "")); setOpen(true) }
+
   return (
-    <div className="page page-wide">
+    <div className="page page-wide page-stack">
       <PageHeader
+        icon={Globe2}
+        kicker="Infrastructure"
         title="Domains"
         description="Local endpoints stay reachable on the LAN. Public hostnames show the DNS and certificate steps without contacting a certificate authority."
-        actions={<Button variant="primary" onClick={() => { setProjectId(state.projects[0]?.id ?? ""); setPort(String(state.projects[0]?.exposedPort ?? "")); setOpen(true) }}>Add domain</Button>}
+        actions={<Button variant="primary" onClick={openAdd}><Plus aria-hidden />Add domain</Button>}
       />
-      <section className="mt-8">
-        <h2 className="text-[15px] font-semibold">Local endpoints</h2>
-        <hr className="hairline my-3" />
-        {state.projects.length === 0 ? <p className="text-sm text-muted">No projects are exposing a port.</p> : (
-          <ul className="panel resource-list">
+      <StatGrid>
+        <StatCard icon={Network} tone="brand" label="Local endpoints" value={state.projects.length} detail="One per project" />
+        <StatCard icon={Globe2} tone="info" label="Hostnames" value={state.domains.length} detail="Private and public" />
+        <StatCard icon={ShieldCheck} tone="success" label="Active" value={active} detail="Resolving to a project" />
+        <StatCard icon={Clock} tone={waiting ? "warning" : "neutral"} label="Need action" value={waiting} detail={waiting ? "DNS or verification pending" : "Nothing pending"} />
+      </StatGrid>
+      <section>
+        <SectionHeading title="Local endpoints" count={state.projects.length} />
+        {state.projects.length === 0 ? <EmptyPanel icon={Network} title="No endpoints" body="No projects are exposing a port." /> : (
+          <div className="card-grid card-grid-3">
             {state.projects.map((project) => {
               const endpoint = projectEndpoint(project, state.servers[0]?.ip)
               return (
-                <li key={project.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                  <span>
-                    <span className="block font-medium">{project.name}</span>
-                    <span className="font-mono text-sm text-muted">{endpoint}</span>
-                  </span>
-                  <CopyButton value={endpoint} label="Copy" onCopied={(ok) => toast(ok ? { title: "Endpoint copied" } : { title: "Could not copy", tone: "danger" })} />
-                </li>
+                <div key={project.id} className="card">
+                  <div className="card-head">
+                    <IconTile icon={Network} tone="brand" />
+                    <div className="min-w-0"><p className="card-title">{project.name}</p><p className="card-sub">Port {project.exposedPort} → {project.internalPort}</p></div>
+                    <CopyButton value={endpoint} label="Copy" onCopied={(ok) => toast(ok ? { title: "Endpoint copied" } : { title: "Could not copy", tone: "danger" })} />
+                  </div>
+                  <code className="code-chip">{endpoint}</code>
+                </div>
               )
             })}
-          </ul>
+          </div>
         )}
       </section>
-      <section className="mt-10">
-        <h2 className="text-[15px] font-semibold">Hostnames</h2>
-        <hr className="hairline my-3" />
+      <section>
+        <SectionHeading title="Hostnames" count={state.domains.length} aside={<Button variant="ghost" size="sm" onClick={openAdd}><Plus aria-hidden />Add</Button>} />
         {state.domains.length === 0 ? (
-          <EmptyState title="No custom domains" body="Your applications can still be reached through their local endpoint." />
+          <EmptyPanel icon={Globe2} title="No custom domains" body="Your applications can still be reached through their local endpoint." />
         ) : (
-          <ul className="panel resource-list">
+          <ItemList label="Hostnames">
             {state.domains.map((domain) => {
               const project = state.projects.find((item) => item.id === domain.projectId)
               return (
-                <li key={domain.id} className="px-4 py-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="font-medium">{domain.name}</p>
-                      <p className="text-sm text-muted">{project?.name ?? "Unassigned"} · port {domain.targetPort} · {domain.kind === "private" ? "Private hostname" : "Public domain"} · added {formatRelative(domain.createdAt, now)}</p>
-                    </div>
-                    <DomainStatusView value={domain.status} />
-                  </div>
-                  <p className="mt-2 text-sm text-muted">
+                <ItemRow
+                  key={domain.id}
+                  icon={domain.kind === "public" ? Globe2 : Network}
+                  tone={domain.status === "active" ? "success" : domain.status === "invalid" ? "danger" : domain.status === "verifying" || domain.status === "issuing" ? "info" : "warning"}
+                  title={domain.name}
+                  subtitle={`${project?.name ?? "Unassigned"} · port ${domain.targetPort} · added ${formatRelative(domain.createdAt, now)}`}
+                  meta={[<Tag key="k" tone={domain.kind === "public" ? "brand" : "neutral"}>{domain.kind === "private" ? "Private" : domain.kind === "public" ? "Public" : "Local"}</Tag>]}
+                  metaWidths={[80]}
+                  trailing={<DomainStatusView value={domain.status} />}
+                >
+                  <p className="flex items-center gap-2 text-xs text-muted">
+                    <Lock size={13} aria-hidden className="text-faint" />
                     {domain.ssl === "simulated-active" ? "Simulated certificate. Phase 1 does not contact a certificate authority." : domain.ssl === "none" ? "No public certificate. This name is for the local network." : domain.ssl === "failed" ? "Certificate was not issued." : "Certificate has not been issued."}
                   </p>
-                  {domain.error ? <p className="mt-2 text-sm text-[var(--status-danger)]">{domain.error}</p> : null}
+                  {domain.error ? <p className="mt-2 text-xs text-[var(--status-danger)]">{domain.error}</p> : null}
                   {domain.records.length ? (
-                    <ul className="mt-3 space-y-2">
+                    <ul className="dns-records">
                       {domain.records.map((record) => (
-                        <li key={record.type + record.host} className="text-sm">
-                          <span className="font-mono">{record.type} {record.host} → {record.value}</span>
-                          <span className="block text-muted">{record.purpose}</span>
+                        <li key={record.type + record.host}>
+                          <Tag tone="info">{record.type}</Tag>
+                          <span className="min-w-0 flex-1"><span className="block truncate font-mono text-[11.5px]">{record.host} → {record.value}</span><span className="block text-[11px] text-faint">{record.purpose}</span></span>
                         </li>
                       ))}
                     </ul>
@@ -95,10 +111,10 @@ export function DomainsView() {
                     ) : null}
                     <Button variant="danger" size="sm" onClick={() => setRemove(domain.id)}>Remove</Button>
                   </div>
-                </li>
+                </ItemRow>
               )
             })}
-          </ul>
+          </ItemList>
         )}
       </section>
       <Modal open={open} onOpenChange={setOpen} title="Add a domain" description="Enter a hostname, choose the project, and confirm the port it should reach.">
