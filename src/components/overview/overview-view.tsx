@@ -7,7 +7,8 @@ import { BoxesIcon, EarthIcon, FolderKanbanIcon, GitBranchIcon, SparklesIcon } f
 import { type AnimatedIcon, useIconAnimation } from "@/components/ui/animated-icon"
 import { PageSkeleton } from "@/components/ui/bits"
 import { FRAMEWORKS } from "@/lib/deploy/detect"
-import { formatGb, formatRelative, greeting } from "@/lib/deploy/format"
+import { formatGb, formatRelative, formatUptime, greeting } from "@/lib/deploy/format"
+import { ReleaseChart } from "@/components/overview/release-chart"
 import { homeServer, latestDeployment, projectBadge, sourceText } from "@/lib/deploy/helpers"
 import { useDeployState } from "@/lib/deploy/react"
 import { useNow } from "@/lib/use-now"
@@ -67,7 +68,8 @@ export function OverviewView() {
         {waiting.map((domain) => <Link key={domain.id} href="/domains" className="notice-row"><CircleAlert aria-hidden /><span><strong className="font-medium">{domain.name}</strong><span className="ml-2 text-muted">{domain.status === "invalid" ? "Check DNS configuration" : "Waiting for DNS verification"}</span></span><span className="notice-action">Review<ArrowRight size={14} /></span></Link>)}
       </div> : null}
 
-      <section>
+      <div className="overview-split">
+        <section className="min-w-0">
         <SectionHeading title="Projects" href="/projects" />
         <div className="panel">
           {projects.length === 0 ? <div className="p-6"><p className="font-medium">No projects yet</p><Link href="/projects/new" className="mt-3 inline-block text-brand">Deploy your first application →</Link></div> :
@@ -82,7 +84,12 @@ export function OverviewView() {
               </Link></li>
             })}</ul>}
         </div>
-      </section>
+        </section>
+        <section className="min-w-0">
+          <SectionHeading title="Releases this week" href="/deployments" action="All releases" />
+          <ReleaseChart deployments={state.deployments} now={now} />
+        </section>
+      </div>
 
       <AskArcCard />
 
@@ -93,7 +100,11 @@ export function OverviewView() {
           <SectionHeading title="Server" href={`/servers/${server.id}`} action="Open server" />
           <div className="panel server-summary dashboard-summary-card">
             <div className="flex items-start justify-between gap-3"><div><Link href={`/servers/${server.id}`} className="text-sm font-semibold hover:underline">{server.name}</Link><p className="mt-1 text-xs text-faint">{server.os} · {server.arch}</p></div><ServerStatusView value={server.status} /></div>
-            <p className="mt-3 font-mono text-xs text-muted">{server.ip}</p>
+            <ul className="activity-mini">
+              <li><span className="activity-mini-dot" data-result="info" aria-hidden /><span className="min-w-0 flex-1 truncate"><span className="font-medium">Address</span><span className="text-faint"> · {server.iface}</span></span><code className="font-mono text-[11px] text-muted">{server.ip}</code></li>
+              <li><span className="activity-mini-dot" data-result={server.dockerStatus === "running" ? "success" : "error"} aria-hidden /><span className="min-w-0 flex-1 truncate"><span className="font-medium">Docker</span><span className="text-faint"> · {server.dockerStatus}</span></span><time>{server.dockerVersion}</time></li>
+              <li><span className="activity-mini-dot" data-result={server.agentStatus === "connected" ? "success" : "error"} aria-hidden /><span className="min-w-0 flex-1 truncate"><span className="font-medium">Agent</span><span className="text-faint"> · {server.agentStatus}</span></span><time>up {formatUptime(server.startedAt, now)}</time></li>
+            </ul>
             <hr className="hairline my-5" />
             {server.status === "offline" ? <p className="text-sm text-muted">Metrics are paused while the server is offline.</p> : <dl className="server-resource-grid">
               <Metric label="CPU" value={`${server.cpuPercent}%`} meter={server.cpuPercent} />

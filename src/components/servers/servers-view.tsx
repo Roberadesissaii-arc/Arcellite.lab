@@ -1,12 +1,12 @@
 "use client"
 
 import Link from "next/link"
-import { Activity, ArrowUpRight, Boxes, Cpu, Network, Radio, RefreshCw, Server, type LucideIcon } from "lucide-react"
+import { Activity, ArrowUpRight, Boxes, Cable, Clock, Container, Cpu, Gauge, Globe2, HardDrive, History, Layers, MapPin, MemoryStick, Monitor, Network, Plug, Radio, RefreshCw, Router, Server, type LucideIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/toast"
 import { PageHeader } from "@/components/page-header"
 import { PageSkeleton } from "@/components/ui/bits"
-import { IconTile, SectionHeading, SegmentMeter, StatCard, StatGrid, Tag } from "@/components/ui/kit"
+import { IconTile, SectionHeading, SegmentMeter, StatCard, StatGrid, Tag, type Tone } from "@/components/ui/kit"
 import { ServerStatusView } from "@/components/ui/status"
 import { formatGb, formatPercent, formatRelative, formatUptime, plural } from "@/lib/deploy/format"
 import { useDeploy, useDeployState } from "@/lib/deploy/react"
@@ -36,6 +36,9 @@ export function ServersView() {
           {state.servers.map((server) => {
             const containers = state.containers.filter((item) => item.serverId === server.id)
             const projects = new Set(containers.map((item) => item.projectId).filter(Boolean))
+            const ports = containers.flatMap((container) => container.ports.filter((port) => port.host).map((port) => ({ host: port.host, container: port.container, name: container.name })))
+            const names = new Set([server.name, ...containers.map((container) => container.name)])
+            const events = state.activity.filter((event) => names.has(event.objectName) || event.objectType === "Server").slice(0, 4)
             return (
               <li key={server.id} className="panel">
                 <Link href={`/servers/${server.id}`} className="item-row" data-interactive>
@@ -60,25 +63,49 @@ export function ServersView() {
                   )}
                 </div>
                 <div className="server-details">
-                  <DetailBlock icon={Cpu} title="Hardware" rows={[
-                    ["CPU", `${server.cpuCount} cores · ${server.arch}`],
-                    ["Memory", `${formatGb(server.memoryTotalGb)} total`],
-                    ["Disk", `${formatGb(server.storageTotalGb)} total`],
-                    ["System", server.os],
+                  <DetailBlock icon={Cpu} tone="brand" title="Hardware" rows={[
+                    ["CPU", <Chip key="c">{server.cpuCount} cores</Chip>, Cpu],
+                    ["Architecture", <Chip key="a" mono>{server.arch}</Chip>, Layers],
+                    ["Memory", <Chip key="m">{formatGb(server.memoryTotalGb)}</Chip>, MemoryStick],
+                    ["Disk", <Chip key="d">{formatGb(server.storageTotalGb)}</Chip>, HardDrive],
+                    ["System", <span key="s" className="font-medium text-[var(--text-primary)]">{server.os}</span>, Monitor],
                   ]} />
-                  <DetailBlock icon={Network} title="Network" rows={[
-                    ["Address", <span key="a" className="font-mono">{server.ip}</span>],
-                    ["Interface", <span key="i" className="font-mono">{server.iface} · {server.cidr}</span>],
-                    ["Gateway", <span key="g" className="font-mono">{server.gateway}</span>],
-                    ["DNS", <span key="d" className="font-mono">{server.dns.join(", ")}</span>],
-                    ["Throughput", `${server.networkMbps} Mbps`],
+                  <DetailBlock icon={Network} tone="info" title="Network" rows={[
+                    ["Address", <Chip key="a" mono>{server.ip}</Chip>, MapPin],
+                    ["Interface", <Chip key="i" mono>{server.iface}</Chip>, Cable],
+                    ["Subnet", <Chip key="n" mono>{server.cidr}</Chip>, Network],
+                    ["Gateway", <Chip key="g" mono>{server.gateway}</Chip>, Router],
+                    ["DNS", <Chip key="d" mono>{server.dns.join(", ")}</Chip>, Globe2],
                   ]} />
-                  <DetailBlock icon={Activity} title="Runtime" rows={[
-                    ["Docker", <StatusText key="d" ok={server.dockerStatus === "running"} text={`${server.dockerVersion} · ${server.dockerStatus}`} />],
-                    ["Agent", <StatusText key="a" ok={server.agentStatus === "connected"} text={`${server.agentVersion} · ${server.agentStatus}`} />],
-                    ["Uptime", formatUptime(server.startedAt, now)],
-                    ["Last check", server.refreshedAt ? formatRelative(server.refreshedAt, now) : "Live stream"],
+                  <DetailBlock icon={Activity} tone="success" title="Runtime" rows={[
+                    ["Docker", <StatusText key="d" ok={server.dockerStatus === "running"} text={`${server.dockerVersion} · ${server.dockerStatus}`} />, Container],
+                    ["Agent", <StatusText key="a" ok={server.agentStatus === "connected"} text={`${server.agentVersion} · ${server.agentStatus}`} />, Radio],
+                    ["Uptime", <Chip key="u">{formatUptime(server.startedAt, now)}</Chip>, Clock],
+                    ["Throughput", <Chip key="t">{server.networkMbps} Mbps</Chip>, Gauge],
+                    ["Last check", <span key="l" className="font-medium text-[var(--text-primary)]">{server.refreshedAt ? formatRelative(server.refreshedAt, now) : "Live stream"}</span>, RefreshCw],
                   ]} />
+                </div>
+                <div className="server-bottom">
+                  <section>
+                    <p className="server-bottom-title"><Plug aria-hidden />Ports in use <span className="section-count">{ports.length}</span></p>
+                    <div className="server-ports">
+                      {ports.map((port) => <span key={`${port.host}-${port.name}`} className="server-port"><code>:{port.host}</code><small>{port.name} → {port.container}</small></span>)}
+                      {ports.length === 0 ? <span className="text-xs text-faint">No published ports.</span> : null}
+                    </div>
+                  </section>
+                  <section>
+                    <p className="server-bottom-title"><History aria-hidden />Recent events</p>
+                    <ul className="server-events">
+                      {events.map((event) => (
+                        <li key={event.id}>
+                          <span className="activity-mini-dot" data-result={event.result} aria-hidden />
+                          <span className="min-w-0 flex-1 truncate"><strong>{event.action}</strong> · {event.objectName}</span>
+                          <time dateTime={event.timestamp}>{formatRelative(event.timestamp, now)}</time>
+                        </li>
+                      ))}
+                      {events.length === 0 ? <li className="text-faint">No events yet.</li> : null}
+                    </ul>
+                  </section>
                 </div>
                 <div className="server-workloads">
                   <p className="server-workloads-title">Workloads on this server <span className="section-count">{containers.length}</span></p>
@@ -114,17 +141,21 @@ function Resource({ label, value, meter }: { label: string; value: string; meter
   )
 }
 
-function DetailBlock({ icon, title, rows }: { icon: LucideIcon; title: string; rows: [string, React.ReactNode][] }) {
+function DetailBlock({ icon, tone, title, rows }: { icon: LucideIcon; tone: Tone; title: string; rows: [string, React.ReactNode, LucideIcon][] }) {
   return (
     <section className="server-detail">
-      <p className="server-detail-title"><IconTile icon={icon} tone="neutral" size="sm" />{title}</p>
+      <p className="server-detail-title"><IconTile icon={icon} tone={tone} size="sm" />{title}</p>
       <dl>
-        {rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+        {rows.map(([label, value, RowIcon]) => <div key={label}><dt><RowIcon aria-hidden />{label}</dt><dd>{value}</dd></div>)}
       </dl>
     </section>
   )
 }
 
+function Chip({ children, mono = false }: { children: React.ReactNode; mono?: boolean }) {
+  return <span className={mono ? "server-chip-value font-mono" : "server-chip-value"}>{children}</span>
+}
+
 function StatusText({ ok, text }: { ok: boolean; text: string }) {
-  return <span className="inline-flex items-center gap-1.5"><span className="status-pip" data-ok={ok} aria-hidden />{text}</span>
+  return <span className="server-status-pill" data-ok={ok}><span className="status-pip" data-ok={ok} aria-hidden />{text}</span>
 }

@@ -43,9 +43,9 @@ export const NAV_GROUPS: { id: string; label: string; items: NavItem[] }[] = [
     label: "Infrastructure",
     items: [
       { href: "/servers", label: "Servers", icon: Server },
-      { href: "/containers", label: "Containers", icon: Boxes },
-      { href: "/domains", label: "Domains", icon: Globe2 },
       { href: "/storage", label: "Storage", icon: HardDrive },
+      { href: "/domains", label: "Domains", icon: Globe2 },
+      { href: "/containers", label: "Containers", icon: Boxes },
       { href: "/databases", label: "Databases", icon: Database },
     ],
   },

@@ -5,14 +5,16 @@ import { useParams, useRouter } from "next/navigation"
 import { useState } from "react"
 import { EnvEditor, envError } from "@/components/projects/env-editor"
 import { Button } from "@/components/ui/button"
-import { CopyButton, EmptyState } from "@/components/ui/bits"
+import { copyText, EmptyState } from "@/components/ui/bits"
 import { Field, SelectInput, TextInput } from "@/components/ui/fields"
-import { DomainStatusView, DeploymentStatusView } from "@/components/ui/status"
+import { ContainerStatusView, DomainStatusView, DeploymentStatusView } from "@/components/ui/status"
+import { IconTile, ItemList, ItemRow, SectionHeading, SegmentMeter, StatCard, StatGrid, Tag, deploymentTone } from "@/components/ui/kit"
+import { ArrowUpRight, Boxes, Clock, Copy, Cpu, ExternalLink, GitBranch, Globe2, KeyRound, Lock, LockOpen, MemoryStick, Rocket } from "lucide-react"
 import { useToast } from "@/components/ui/toast"
 import { LogStream } from "@/components/logs/log-stream"
 import { FRAMEWORKS, FRAMEWORK_ORDER } from "@/lib/deploy/detect"
 import { formatDuration, formatRelative, formatUptime } from "@/lib/deploy/format"
-import { deploymentsFor, liveDeployment, portTaken, projectEndpoint, sourceText } from "@/lib/deploy/helpers"
+import { deploymentsFor, liveDeployment, portTaken, projectEndpoint } from "@/lib/deploy/helpers"
 import { useDeploy, useDeployState } from "@/lib/deploy/react"
 import { useNow } from "@/lib/use-now"
 import type { EnvironmentVariable, Framework, RestartPolicy } from "@/lib/deploy/types"
@@ -28,64 +30,125 @@ function useProject() {
 export function ProjectOverview() {
   const { state, project } = useProject()
   const now = useNow()
+  const toast = useToast()
   if (!state || !project) return null
-  const latest = deploymentsFor(state.deployments, project.id, now)[0]
+  const history = deploymentsFor(state.deployments, project.id, now)
+  const latest = history[0]
   const live = liveDeployment(state, project, now)
-  const container = state.containers.find((item) => item.projectId === project.id && item.role === "web")
+  const containers = state.containers.filter((item) => item.projectId === project.id)
+  const web = containers.find((item) => item.role === "web")
   const endpoint = projectEndpoint(project, state.servers[0]?.ip)
-  const server = state.servers[0]
+  const server = state.servers.find((item) => item.id === web?.serverId) ?? state.servers[0]
+  const domains = state.domains.filter((item) => item.projectId === project.id)
+  const secrets = project.env.filter((item) => item.secret).length
+  const ready = history.filter((item) => item.status === "ready").length
+  const memoryPct = server && web ? (web.memoryMb / 1024 / server.memoryTotalGb) * 100 : 0
+  const finished = history.filter((item) => item.finishedAt)
+  const avgMs = finished.length ? finished.reduce((sum, item) => sum + (Date.parse(item.finishedAt!) - Date.parse(item.createdAt)), 0) / finished.length : 0
+
   return (
-    <div className="grid gap-5 lg:grid-cols-2">
-      <section className="panel p-5">
-        <h2 className="text-[15px] font-semibold">Production deployment</h2>
-        <hr className="hairline my-3" />
-        {latest ? (
-          <>
-            <DeploymentStatusView value={latest.status} />
-            <p className="mt-4 font-mono text-sm">{latest.branch ?? "no branch"} · {latest.commitSha}</p>
-            <p className="mt-1 text-sm">{latest.commitMessage}</p>
-            <p className="mt-2 text-sm text-muted">{formatRelative(latest.createdAt, now)}</p>
-            <Link href={`/deployments/${latest.id}`} className="mt-4 inline-block text-sm text-muted underline underline-offset-4">
-              Open deployment
-            </Link>
-          </>
-        ) : (
-          <p className="text-sm text-muted">No deployment yet.</p>
-        )}
-        {live && latest && live.id !== latest.id ? (
-          <p className="mt-4 text-sm text-muted">A previous release is still the one being served.</p>
-        ) : null}
-      </section>
-      <section className="panel p-5">
-        <h2 className="text-[15px] font-semibold">Runtime</h2>
-        <hr className="hairline my-3" />
-        <dl className="grid grid-cols-[140px_1fr] gap-y-2 text-sm">
-          <dt className="text-muted">Framework</dt>
-          <dd>{FRAMEWORKS[project.framework].label}</dd>
-          <dt className="text-muted">Port</dt>
-          <dd>{project.internalPort} → {project.exposedPort}</dd>
-          <dt className="text-muted">Memory</dt>
-          <dd>{container ? `${container.memoryMb} MB` : "—"}</dd>
-          <dt className="text-muted">CPU</dt>
-          <dd>{container ? `${container.cpuPercent}%` : "—"}</dd>
-          <dt className="text-muted">Uptime</dt>
-          <dd>{formatUptime(container?.startedAt ?? null, now)}</dd>
-          <dt className="text-muted">Source</dt>
-          <dd>{sourceText(project)}</dd>
-        </dl>
-      </section>
-      <section className="panel p-5 lg:col-span-2">
-        <h2 className="text-[15px] font-semibold">Endpoint</h2>
-        <hr className="hairline my-3" />
-        <p className="font-mono text-sm">{endpoint}</p>
-        <p className="mt-2 text-sm text-muted">
-          Local endpoint on {server?.name ?? "this server"}. {project.hostname} is a private hostname for the LAN.
-        </p>
-        <div className="mt-3 flex gap-2">
-          <CopyButton value={endpoint} label="Copy" onCopied={(ok) => ok} />
-          <a className="btn btn-secondary" href={endpoint} target="_blank" rel="noreferrer">Open</a>
-          <Link className="btn btn-ghost" href={`/projects/${project.id}/domains`}>Configure domain</Link>
-        </div>
+    <div className="page-stack">
+      <StatGrid>
+        <StatCard icon={Rocket} tone="brand" label="Releases" value={history.length} detail={`${ready} ready`} />
+        <StatCard icon={Cpu} tone="info" label="CPU" value={<>{web ? web.cpuPercent : 0}<small>%</small></>} detail={web ? `${web.name}` : "No web container"} />
+        <StatCard icon={MemoryStick} tone="neutral" label="Memory" value={<>{web ? web.memoryMb : 0}<small> MB</small></>} detail={server ? `of ${server.memoryTotalGb} GB on ${server.name}` : "—"} />
+        <StatCard icon={Clock} tone="success" label="Uptime" value={formatUptime(web?.startedAt ?? null, now)} detail={avgMs ? `Average build ${formatDuration(avgMs)}` : "No finished builds"} />
+      </StatGrid>
+
+      <div className="project-grid">
+        <section className="panel project-card">
+          <div className="project-card-head">
+            <IconTile icon={GitBranch} tone={latest ? deploymentTone(latest.status) : "neutral"} />
+            <div className="min-w-0 flex-1"><h2>Latest deployment</h2><p>{latest ? formatRelative(latest.createdAt, now) : "Nothing deployed yet"}</p></div>
+            {latest ? <DeploymentStatusView value={latest.status} /> : null}
+          </div>
+          {latest ? (
+            <>
+              <p className="project-commit">{latest.commitMessage || latest.sourceLabel}</p>
+              <div className="project-chips">
+                <code className="table-code">{latest.branch ?? "upload"}</code>
+                <code className="table-code">{latest.commitSha}</code>
+                <Tag><span className="capitalize">{latest.environment}</span></Tag>
+                <span className="text-[11px] text-faint">by {latest.triggeredBy}</span>
+              </div>
+              <ol className="project-steps" aria-label="Pipeline steps">
+                {latest.steps.map((step) => <li key={step.phase} data-status={step.status}><span aria-hidden />{step.label}</li>)}
+              </ol>
+              {live && live.id !== latest.id ? <p className="mt-3 text-xs text-muted">A previous release ({live.commitSha}) is still serving traffic.</p> : null}
+              <div className="project-card-foot">
+                <Link href={`/deployments/${latest.id}`} className="btn btn-secondary btn-sm">Open deployment<ArrowUpRight aria-hidden /></Link>
+                <Link href={`/projects/${project.id}/logs`} className="btn btn-ghost btn-sm">Build logs</Link>
+              </div>
+            </>
+          ) : <p className="mt-4 text-sm text-muted">Deploy the project to see its first release here.</p>}
+        </section>
+
+        <section className="panel project-card">
+          <div className="project-card-head">
+            <IconTile icon={Boxes} tone="brand" />
+            <div className="min-w-0 flex-1"><h2>Runtime</h2><p>{containers.length} container{containers.length === 1 ? "" : "s"} on {server?.name ?? "—"}</p></div>
+            {web ? <ContainerStatusView value={web.state} /> : null}
+          </div>
+          <dl className="server-resource-grid project-resources">
+            <div className="resource-stat"><dt>CPU</dt><dd>{web ? `${web.cpuPercent}%` : "—"}</dd><SegmentMeter value={web?.cpuPercent ?? 0} label="CPU" /></div>
+            <div className="resource-stat"><dt>Memory</dt><dd>{web ? `${web.memoryMb} MB` : "—"}</dd><SegmentMeter value={memoryPct} label="Memory" /></div>
+          </dl>
+          <dl className="project-facts">
+            <div><dt>Framework</dt><dd>{FRAMEWORKS[project.framework].label}</dd></div>
+            <div><dt>Ports</dt><dd><code className="table-code">{project.exposedPort} → {project.internalPort}</code></dd></div>
+            <div><dt>Start</dt><dd><code className="table-code">{project.startCommand || "—"}</code></dd></div>
+            <div><dt>Health check</dt><dd><code className="table-code">{project.healthPath}</code></dd></div>
+            <div><dt>Restart</dt><dd>{project.restartPolicy}</dd></div>
+          </dl>
+        </section>
+
+        <section className="panel project-card">
+          <div className="project-card-head">
+            <IconTile icon={Globe2} tone="info" />
+            <div className="min-w-0 flex-1"><h2>Endpoints</h2><p>Where this project is reachable</p></div>
+          </div>
+          <div className="project-endpoint">
+            <code>{endpoint}</code>
+            <button type="button" className="icon-btn" aria-label="Copy endpoint" onClick={() => void copyText(endpoint).then((ok) => toast(ok ? { title: "Endpoint copied" } : { title: "Could not copy", tone: "danger" }))}><Copy aria-hidden /></button>
+            <a className="icon-btn" href={endpoint} target="_blank" rel="noreferrer" aria-label="Open endpoint"><ExternalLink aria-hidden /></a>
+          </div>
+          <ul className="project-domain-list">
+            {domains.map((domain) => <li key={domain.id}><span className="min-w-0 flex-1 truncate font-medium">{domain.name}</span><DomainStatusView value={domain.status} /></li>)}
+            {domains.length === 0 ? <li className="text-muted">No hostnames yet.</li> : null}
+          </ul>
+          <div className="project-card-foot"><Link href={`/projects/${project.id}/domains`} className="btn btn-ghost btn-sm">Manage domains<ArrowUpRight aria-hidden /></Link></div>
+        </section>
+
+        <section className="panel project-card">
+          <div className="project-card-head">
+            <IconTile icon={KeyRound} tone="success" />
+            <div className="min-w-0 flex-1"><h2>Environment</h2><p>{project.env.length} variables · {secrets} secret{secrets === 1 ? "" : "s"}</p></div>
+          </div>
+          <ul className="project-env-list">
+            {project.env.slice(0, 4).map((variable) => <li key={variable.id}><span className="env-lock" data-secret={variable.secret}>{variable.secret ? <Lock aria-hidden /> : <LockOpen aria-hidden />}</span><code>{variable.key}</code><Tag>{variable.scope === "all" ? "Shared" : variable.scope}</Tag></li>)}
+            {project.env.length === 0 ? <li className="text-muted">No variables yet.</li> : null}
+          </ul>
+          <div className="project-card-foot"><Link href={`/projects/${project.id}/environment`} className="btn btn-ghost btn-sm">Edit variables<ArrowUpRight aria-hidden /></Link></div>
+        </section>
+      </div>
+
+      <section>
+        <SectionHeading title="Recent releases" count={history.length} href={`/projects/${project.id}/deployments`} />
+        <ItemList label="Recent releases">
+          {history.slice(0, 5).map((deployment) => (
+            <ItemRow
+              key={deployment.id}
+              href={`/deployments/${deployment.id}`}
+              icon={GitBranch}
+              tone={deploymentTone(deployment.status)}
+              title={deployment.commitMessage || deployment.sourceLabel}
+              subtitle={`${deployment.branch ?? "upload"} · ${deployment.commitSha} · ${formatRelative(deployment.createdAt, now)}`}
+              meta={[<span key="d" className="text-faint">{deployment.finishedAt ? formatDuration(Date.parse(deployment.finishedAt) - Date.parse(deployment.createdAt)) : "In progress"}</span>]}
+              metaWidths={[90]}
+              trailing={<DeploymentStatusView value={deployment.status} />}
+            />
+          ))}
+        </ItemList>
       </section>
     </div>
   )
