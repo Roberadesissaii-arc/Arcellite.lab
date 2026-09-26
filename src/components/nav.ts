@@ -32,7 +32,7 @@ export const NAV_GROUPS: { id: string; label: string; items: NavItem[] }[] = [
     label: "Workspace",
     items: [
       { href: "/", label: "Overview", icon: LayoutDashboard },
-      { href: "/chat", label: "Project chat", icon: Sparkle },
+      { href: "/chat", label: "Ask Arc", icon: Sparkle },
       { href: "/projects", label: "Projects", icon: Files },
       { href: "/deployments", label: "Deployments", icon: PackagePlus },
     ],

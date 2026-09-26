@@ -1,5 +1,6 @@
 "use client"
 
+import { Terminal } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 import { LogStream } from "@/components/logs/log-stream"
 import { PageSkeleton } from "@/components/ui/bits"
@@ -10,7 +11,7 @@ export function LogsView() {
   if (!state) return <PageSkeleton />
   return (
     <div className="page page-wide">
-      <PageHeader title="Logs" description="Deployment output and runtime lines. Only the stream uses a monospace face." />
+      <PageHeader icon={Terminal} kicker="Observe" title="Logs" description="Deployment output and runtime lines from every project, container, and server." />
       <div className="mt-6">
         <LogStream target="all" allowTarget />
       </div>

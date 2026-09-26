@@ -1,7 +1,7 @@
 "use client"
 
 import { Check, Copy } from "lucide-react"
-import { useState } from "react"
+import { useId, useState } from "react"
 import { cn } from "@/lib/cn"
 
 export function Meter({
@@ -102,33 +102,34 @@ export function Sparkline({
   values,
   label,
   format,
+  tall = false,
 }: {
   values: number[]
   label: string
   format: (value: number) => string
+  tall?: boolean
 }) {
   const [hover, setHover] = useState<number | null>(null)
+  const gradientId = useId()
   if (values.length < 2) return <p className="text-sm text-faint">No samples yet.</p>
   const min = Math.min(...values)
   const max = Math.max(...values)
   const span = max - min || 1
   const width = 320
-  const height = 64
+  const height = tall ? 120 : 64
   const step = width / (values.length - 1)
-  const points = values
-    .map((value, index) => {
-      const x = index * step
-      const y = height - ((value - min) / span) * (height - 8) - 4
-      return `${x},${y}`
-    })
-    .join(" ")
+  const coords = values.map((value, index) => [index * step, height - ((value - min) / span) * (height - 12) - 6] as const)
+  const points = coords.map(([x, y]) => `${x},${y}`).join(" ")
+  const area = `M0,${height} L${coords.map(([x, y]) => `${x},${y}`).join(" L")} L${width},${height} Z`
   const active = hover ?? values.length - 1
   const activeValue = values[active] ?? values[values.length - 1]
+  const [ax, ay] = coords[active] ?? coords[coords.length - 1]
   return (
     <div className="relative">
       <svg
         viewBox={`0 0 ${width} ${height}`}
-        className="h-16 w-full"
+        preserveAspectRatio="none"
+        className={tall ? "h-[120px] w-full overflow-visible" : "h-16 w-full overflow-visible"}
         role="img"
         aria-label={label}
         onPointerMove={(event) => {
@@ -138,9 +139,18 @@ export function Sparkline({
         }}
         onPointerLeave={() => setHover(null)}
       >
-        <polyline fill="none" stroke="currentColor" strokeWidth="1.5" points={points} className="text-brand" />
+        <defs>
+          <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="var(--brand-primary)" stopOpacity="0.18" />
+            <stop offset="100%" stopColor="var(--brand-primary)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={area} fill={`url(#${gradientId})`} />
+        <polyline fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" points={points} className="text-brand" />
+        {hover != null ? <line x1={ax} x2={ax} y1={0} y2={height} stroke="var(--border-strong)" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" /> : null}
       </svg>
-      <p className="mt-1 text-xs text-muted tabular-nums">
+      <span className="sparkline-dot" style={{ left: `${(ax / width) * 100}%`, top: ay }} aria-hidden />
+      <p className="mt-2 text-xs text-muted tabular-nums">
         {hover == null ? "Now" : `${values.length - 1 - hover}h ago`} · {format(activeValue)}
       </p>
     </div>

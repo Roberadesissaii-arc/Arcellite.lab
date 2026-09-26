@@ -1,6 +1,8 @@
 "use client"
 
 import { useState } from "react"
+import { FolderGit2, Lock, Palette, Rocket, Server, Settings, SlidersHorizontal, Wrench, type LucideIcon } from "lucide-react"
+import { IconTile } from "@/components/ui/kit"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { PageSkeleton } from "@/components/ui/bits"
@@ -11,6 +13,16 @@ import { useDeploy, useDeployState } from "@/lib/deploy/react"
 import type { EnvironmentName, MotionChoice } from "@/lib/deploy/types"
 
 const SECTIONS = ["General", "Appearance", "Git providers", "Deployment defaults", "Security", "Server agent", "Advanced"] as const
+
+const SECTION_META: Record<(typeof SECTIONS)[number], { icon: LucideIcon; blurb: string }> = {
+  General: { icon: SlidersHorizontal, blurb: "Workspace name and how you appear." },
+  Appearance: { icon: Palette, blurb: "Shell appearance and motion." },
+  "Git providers": { icon: FolderGit2, blurb: "Repositories Arcellite can import." },
+  "Deployment defaults": { icon: Rocket, blurb: "Branch, ports, and environment for new projects." },
+  Security: { icon: Lock, blurb: "How secrets are shown in the interface." },
+  "Server agent": { icon: Server, blurb: "The agent that runs work on your server." },
+  Advanced: { icon: Wrench, blurb: "Developer tools and demo data." },
+}
 
 export function SettingsView() {
   const state = useDeployState()
@@ -24,16 +36,24 @@ export function SettingsView() {
 
   return (
     <div className="page">
-      <PageHeader title="Settings" description="Preferences for this browser. Phase 1 stores them locally." />
-      <div className="mt-8 grid gap-8 md:grid-cols-[200px_minmax(0,1fr)]">
-        <nav aria-label="Settings sections" className="flex gap-1 overflow-auto md:flex-col">
-          {SECTIONS.map((item) => (
-            <button key={item} type="button" className="rounded-[8px] px-3 py-2 text-left text-sm" style={{ background: section === item ? "var(--press)" : undefined, fontWeight: section === item ? 600 : 500 }} onClick={() => setSection(item)}>
-              {item}
-            </button>
-          ))}
+      <PageHeader icon={Settings} kicker="Workspace" title="Settings" description="Preferences for this browser. Phase 1 stores them locally." />
+      <div className="settings-layout mt-6">
+        <nav aria-label="Settings sections" className="settings-nav">
+          {SECTIONS.map((item) => {
+            const Icon = SECTION_META[item].icon
+            return (
+              <button key={item} type="button" aria-current={section === item} onClick={() => setSection(item)}>
+                <Icon aria-hidden />{item}
+              </button>
+            )
+          })}
         </nav>
-        <div className="max-w-xl">
+        <div className="settings-panel">
+          <div className="settings-panel-head">
+            <IconTile icon={SECTION_META[section].icon} tone="brand" />
+            <div><h2>{section}</h2><p>{SECTION_META[section].blurb}</p></div>
+          </div>
+          <div className="settings-body">
           {section === "General" ? (
             <form className="space-y-4" onSubmit={(event) => {
               event.preventDefault()
@@ -134,6 +154,7 @@ export function SettingsView() {
               <Button variant="danger" onClick={() => setReset(true)}>Reset demo data</Button>
             </div>
           ) : null}
+          </div>
         </div>
       </div>
       <ConfirmDialog

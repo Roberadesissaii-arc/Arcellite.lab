@@ -77,7 +77,7 @@ export function OverviewView() {
         </div>
       </section>
 
-      <Link href="/chat" className="overview-chat"><span className="chat-spark"><Sparkle /></span><span><strong>A second pair of eyes on your projects.</strong><small>Ask what’s running, check a deployment, or find what needs attention.</small></span><span className="chat-open">Open project chat<ArrowUpRight size={15} /></span></Link>
+      <Link href="/chat" className="overview-chat"><span className="chat-spark"><Sparkle /></span><span><strong>Ask Arc — a second pair of eyes on your projects.</strong><small>Ask what’s running, check a deployment, or find what needs attention.</small></span><span className="chat-open">Ask Arc<ArrowUpRight size={15} /></span></Link>
 
       <section><SectionHeading title="Latest deployments" href="/deployments" /><div className="panel"><ul className="panel-list">{recent.map(deployment => <li key={deployment.id}><Link className="release-row" href={`/deployments/${deployment.id}`}><span className="release-icon"><GitBranch size={16} /></span><span className="min-w-0"><strong>{state.projects.find(p => p.id === deployment.projectId)?.name ?? 'Project'}</strong><small className="block truncate text-faint">{deployment.commitMessage || deployment.sourceLabel}</small></span><span className="release-branch">{deployment.branch ?? 'Direct upload'}</span><DeploymentStatusView value={deployment.status} /><time className="text-faint">{formatRelative(deployment.createdAt, now)}</time></Link></li>)}{!recent.length && <li className="p-5 text-muted">Your first deployment will appear here.</li>}</ul></div></section>
 
