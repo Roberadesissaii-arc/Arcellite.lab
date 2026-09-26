@@ -2,12 +2,12 @@
 
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { ArrowUpRight, Copy, Eye, EyeOff, FolderKanban, KeyRound, Layers, Lock, LockOpen, Plus, ShieldCheck, Trash2 } from "lucide-react"
+import { ArrowUpRight, ChevronLeft, ChevronRight, Copy, Eye, EyeOff, FolderKanban, KeyRound, Layers, Lock, LockOpen, Plus, ShieldCheck, Trash2 } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { copyText, PageSkeleton } from "@/components/ui/bits"
 import { Field, SelectInput, TextInput } from "@/components/ui/fields"
-import { EmptyPanel, IconTile, SearchField, SectionHeading, SegmentMeter, StatCard, StatGrid, Tag } from "@/components/ui/kit"
+import { EmptyPanel, IconTile, SearchField, SectionHeading, StatCard, StatGrid, Tag } from "@/components/ui/kit"
 import { ConfirmDialog, Modal } from "@/components/ui/overlays"
 import { useToast } from "@/components/ui/toast"
 import { envError } from "@/components/projects/env-editor"
@@ -25,6 +25,8 @@ const SCOPES: { value: Scope | "any"; label: string }[] = [
 const SCOPE_LABEL: Record<Scope, string> = { all: "All environments", production: "Production", preview: "Preview", development: "Development" }
 const SCOPE_TONE = { all: "neutral", production: "brand", preview: "info", development: "warning" } as const
 
+const PAGE_SIZE = 5
+
 function mask(value: string) {
   return "•".repeat(Math.min(Math.max(value.length, 8), 18))
 }
@@ -41,6 +43,7 @@ export function EnvironmentView() {
   const [removing, setRemoving] = useState<EnvironmentVariable | null>(null)
   const [draft, setDraft] = useState({ key: "", value: "", scope: "all" as Scope, secret: true })
   const [error, setError] = useState<string | null>(null)
+  const [page, setPage] = useState(0)
 
   const project = state?.projects.find((item) => item.id === picked) ?? state?.projects[0] ?? null
   const rows = useMemo(() => {
@@ -49,7 +52,10 @@ export function EnvironmentView() {
     return project.env.filter((item) => (scope === "any" || item.scope === scope) && (!q || item.key.toLowerCase().includes(q)))
   }, [project, scope, search])
 
-  if (!state) return <PageSkeleton />
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
+  const current = Math.min(page, pages - 1)
+  const visible = rows.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE)
+  if (!state) return <PageSkeleton variant="detail" />
   const all = state.projects.flatMap((item) => item.env)
   const secrets = all.filter((item) => item.secret).length
   const configured = state.projects.filter((item) => item.env.length > 0).length
@@ -86,83 +92,102 @@ export function EnvironmentView() {
       {state.projects.length === 0 ? (
         <EmptyPanel icon={KeyRound} title="No projects yet" body="Create a project to give it environment variables." action={<Link href="/projects/new" className="btn btn-primary">New project</Link>} />
       ) : (
-        <div className="page-stack">
-          <section>
-            <SectionHeading title="Projects" count={state.projects.length} />
-            <ul className="env-project-cards">
-              {state.projects.map((item) => {
-                const secretCount = item.env.filter((variable) => variable.secret).length
-                const selected = item.id === project?.id
-                return (
-                  <li key={item.id}>
-                    <button type="button" className="env-project-card pressable" aria-current={selected} onClick={() => { setPicked(item.id); setRevealed({}) }}>
-                      <span className="env-project-head">
-                        <IconTile icon={FolderKanban} tone={selected ? "brand" : "neutral"} />
-                        <span className="min-w-0 flex-1"><strong>{item.name}</strong><small className="capitalize">{item.environment}</small></span>
-                        {selected ? <Tag tone="brand">Selected</Tag> : null}
-                      </span>
-                      <span className="env-project-stats">
-                        <span><b>{item.env.length}</b> variables</span>
-                        <span><b>{secretCount}</b> secret{secretCount === 1 ? "" : "s"}</span>
-                        <span><b>{new Set(item.env.map((variable) => variable.scope)).size}</b> scopes</span>
-                      </span>
-                      <SegmentMeter value={item.env.length ? (secretCount / item.env.length) * 100 : 0} label={`${item.name} share of secret variables`} />
-                    </button>
-                  </li>
-                )
-              })}
+        <section>
+        <SectionHeading title="Variables" aside={<span className="text-xs text-faint">Filters apply to the selected project</span>} />
+        <div className="page-toolbar mb-3">
+          <SearchField value={search} onChange={(value) => { setSearch(value); setPage(0) }} placeholder="Search keys" label="Search variables" />
+          <div className="segmented" role="group" aria-label="Filter by scope">
+            {SCOPES.map((item) => <button key={item.value} type="button" aria-pressed={scope === item.value} onClick={() => { setScope(item.value); setPage(0) }}>{item.label}</button>)}
+          </div>
+        </div>
+        <div className="env-workbench">
+          <aside className="env-rail">
+            <p className="env-rail-label">Projects<span className="section-count">{state.projects.length}</span></p>
+            <ul className="env-projects">
+              {state.projects.map((item) => (
+                <li key={item.id}>
+                  <button type="button" className="pressable" aria-current={item.id === project?.id} onClick={() => { setPicked(item.id); setRevealed({}); setPage(0) }}>
+                    <IconTile icon={FolderKanban} tone={item.id === project?.id ? "brand" : "neutral"} size="sm" />
+                    <span className="min-w-0 flex-1"><strong>{item.name}</strong><small className="capitalize">{item.environment}</small></span>
+                    <span className="section-count">{item.env.length}</span>
+                  </button>
+                </li>
+              ))}
             </ul>
-          </section>
+            <div className="env-note">
+              <ShieldCheck aria-hidden />
+              <p><strong>How secrets are handled.</strong> Values are written to the container at start and never into the image or build log. In Phase 1 they are stored in this browser only.</p>
+            </div>
+          </aside>
 
           {project ? (
-            <section className="min-w-0 env-detail">
-              <SectionHeading title={project.name} count={rows.length} aside={<Link href={`/projects/${project.id}/environment`} className="inline-flex items-center gap-1 text-xs text-muted hover:text-[var(--brand-primary)]">Project settings<ArrowUpRight size={13} aria-hidden /></Link>} />
-              <div className="page-toolbar">
-                <SearchField value={search} onChange={setSearch} placeholder="Search keys" label="Search variables" />
-                <div className="segmented" role="group" aria-label="Filter by scope">
-                  {SCOPES.map((item) => <button key={item.value} type="button" aria-pressed={scope === item.value} onClick={() => setScope(item.value)}>{item.label}</button>)}
+            <section className="env-pane">
+              <header className="env-pane-head">
+                <IconTile icon={FolderKanban} tone="brand" />
+                <div className="min-w-0 flex-1">
+                  <h2>{project.name}</h2>
+                  <p><span className="capitalize">{project.environment}</span> · {project.env.length} variable{project.env.length === 1 ? "" : "s"} · {project.env.filter((item) => item.secret).length} secret</p>
                 </div>
-              </div>
-              <div className="mt-3">
-                {rows.length === 0 ? (
-                  <EmptyPanel icon={KeyRound} title={project.env.length ? "No variables match" : "No variables yet"} body={project.env.length ? "Try another scope or search." : "Add a variable to make it available to this project on its next deploy."} />
-                ) : (
-                  <div className="panel env-table" role="table" aria-label={`${project.name} variables`}>
-                    <div className="env-row env-head" role="row">
-                      <span role="columnheader">Key</span><span role="columnheader">Value</span><span role="columnheader">Scope</span><span role="columnheader" className="sr-only">Actions</span>
-                    </div>
-                    {rows.map((item) => {
-                      const show = !item.secret || revealed[item.id]
-                      return (
-                        <div key={item.id} className="env-row" role="row">
-                          <span role="cell" className="env-key">
-                            <span className="env-lock" data-secret={item.secret} title={item.secret ? "Secret" : "Plain value"}>{item.secret ? <Lock aria-hidden /> : <LockOpen aria-hidden />}</span>
-                            <code>{item.key}</code>
-                          </span>
-                          <span role="cell" className="env-value"><code data-masked={!show}>{show ? item.value || "—" : mask(item.value)}</code></span>
-                          <span role="cell"><Tag tone={SCOPE_TONE[item.scope]}>{SCOPE_LABEL[item.scope]}</Tag></span>
-                          <span role="cell" className="env-actions">
-                            {item.secret ? (
-                              <button type="button" className="icon-btn" aria-label={show ? `Hide ${item.key}` : `Reveal ${item.key}`} onClick={() => setRevealed((current) => ({ ...current, [item.id]: !current[item.id] }))}>{show ? <EyeOff aria-hidden /> : <Eye aria-hidden />}</button>
-                            ) : null}
-                            <button type="button" className="icon-btn" aria-label={`Copy ${item.key}`} onClick={() => void copyText(item.value).then((ok) => toast(ok ? { title: `${item.key} copied` } : { title: "Could not copy", tone: "danger" }))}><Copy aria-hidden /></button>
-                            <button type="button" className="icon-btn" aria-label={`Remove ${item.key}`} onClick={() => setRemoving(item)}><Trash2 aria-hidden /></button>
-                          </span>
-                        </div>
-                      )
+                <Link href={`/projects/${project.id}/environment`} className="env-pane-link">Project settings<ArrowUpRight size={13} aria-hidden /></Link>
+              </header>
+              {project.env.length ? (
+                <div className="env-scope-mix">
+                  <span className="env-scope-bar" role="img" aria-label="Variables by scope">
+                    {(Object.keys(SCOPE_LABEL) as Scope[]).map((key) => {
+                      const count = project.env.filter((item) => item.scope === key).length
+                      return count ? <i key={key} data-scope={key} style={{ flexGrow: count }} /> : null
                     })}
+                  </span>
+                  <ul>
+                    {(Object.keys(SCOPE_LABEL) as Scope[]).map((key) => (
+                      <li key={key} data-scope={key}><i aria-hidden />{key === "all" ? "Shared" : SCOPE_LABEL[key]}<strong>{project.env.filter((item) => item.scope === key).length}</strong></li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {rows.length === 0 ? (
+                <div className="env-pane-empty">
+                  <EmptyPanel icon={KeyRound} title={project.env.length ? "No variables match" : "No variables yet"} body={project.env.length ? "Try another scope or search." : "Add a variable to make it available to this project on its next deploy."} />
+                </div>
+              ) : (
+                <div className="env-table" role="table" aria-label={`${project.name} variables`}>
+                  <div className="env-row env-head" role="row">
+                    <span role="columnheader">Key</span><span role="columnheader">Value</span><span role="columnheader">Scope</span><span role="columnheader" className="env-actions-head">Actions</span>
                   </div>
-                )}
+                  {visible.map((item) => {
+                    const show = !item.secret || revealed[item.id]
+                    return (
+                      <div key={item.id} className="env-row" role="row">
+                        <span role="cell" className="env-key">
+                          <span className="env-lock" data-secret={item.secret} title={item.secret ? "Secret" : "Plain value"}>{item.secret ? <Lock aria-hidden /> : <LockOpen aria-hidden />}</span>
+                          <code>{item.key}</code>
+                        </span>
+                        <span role="cell" className="env-value"><code data-masked={!show}>{show ? item.value || "—" : mask(item.value)}</code></span>
+                        <span role="cell"><Tag tone={SCOPE_TONE[item.scope]}>{SCOPE_LABEL[item.scope]}</Tag></span>
+                        <span role="cell" className="env-actions">
+                          {item.secret ? (
+                            <button type="button" className="icon-btn" aria-label={show ? `Hide ${item.key}` : `Reveal ${item.key}`} onClick={() => setRevealed((current) => ({ ...current, [item.id]: !current[item.id] }))}>{show ? <EyeOff aria-hidden /> : <Eye aria-hidden />}</button>
+                          ) : null}
+                          <button type="button" className="icon-btn" aria-label={`Copy ${item.key}`} onClick={() => void copyText(item.value).then((ok) => toast(ok ? { title: `${item.key} copied` } : { title: "Could not copy", tone: "danger" }))}><Copy aria-hidden /></button>
+                          <button type="button" className="icon-btn" aria-label={`Remove ${item.key}`} onClick={() => setRemoving(item)}><Trash2 aria-hidden /></button>
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+              <div className="data-table-footer env-pane-foot">
+                <p>{rows.length ? <>Showing <strong>{current * PAGE_SIZE + 1}–{Math.min((current + 1) * PAGE_SIZE, rows.length)}</strong> of <strong>{rows.length}</strong> variables</> : "No variables to show"}</p>
+                <div className="flex items-center gap-1">
+                  <span className="mr-2 text-faint">Page {current + 1} of {pages}</span>
+                  <button type="button" className="icon-btn pressable" aria-label="Previous page" disabled={current === 0} onClick={() => setPage(current - 1)}><ChevronLeft aria-hidden /></button>
+                  <button type="button" className="icon-btn pressable" aria-label="Next page" disabled={current >= pages - 1} onClick={() => setPage(current + 1)}><ChevronRight aria-hidden /></button>
+                </div>
               </div>
             </section>
           ) : null}
-
-          <section className="env-security" aria-label="How secrets are handled">
-            <div><ShieldCheck aria-hidden /><p><strong>Never in the image.</strong> Values are written to the container when it starts, not baked into the build.</p></div>
-            <div><EyeOff aria-hidden /><p><strong>Masked by default.</strong> Secrets stay hidden here and are redacted from logs.</p></div>
-            <div><Lock aria-hidden /><p><strong>Local in Phase 1.</strong> Everything is stored in this browser until the server agent ships.</p></div>
-          </section>
         </div>
+        </section>
       )}
 
       <Modal open={adding} onOpenChange={setAdding} title="Add a variable" description={project ? `Available to ${project.name} after its next deploy.` : undefined}>

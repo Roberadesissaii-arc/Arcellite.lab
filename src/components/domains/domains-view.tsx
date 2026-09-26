@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Clock, Globe2, Lock, Network, Plus, SearchX, ShieldCheck } from "lucide-react"
+import { ArrowRightLeft, Check, CircleAlert, Clock, Globe2, Lock, Network, Plus, RefreshCw, SearchX, ShieldCheck, Trash2 } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { CopyButton, PageSkeleton } from "@/components/ui/bits"
@@ -124,35 +124,58 @@ export function DomainsView() {
                     <span className="item-meta"><Tag tone={domain.kind === "public" ? "brand" : "neutral"}>{domain.kind === "private" ? "Private" : domain.kind === "public" ? "Public" : "Local"}</Tag></span>
                     <span className="item-trailing"><DomainStatusView value={domain.status} /></span>
                   </div>
-                  <div className="border-t border-[var(--border-subtle)] px-[18px] py-5">
-                    <ol className="domain-steps" aria-label="Setup progress">
-                      {steps.map((step) => <li key={step.label} data-done={step.done}><span aria-hidden />{step.label}</li>)}
-                    </ol>
-                    <dl className="domain-facts">
-                      <div><dt>Routes to</dt><dd>{project?.name ?? "—"} <span className="text-faint">:{domain.targetPort}</span></dd></div>
-                      <div><dt>Certificate</dt><dd><Lock size={12} aria-hidden className="text-faint" />{domain.ssl === "simulated-active" ? "Simulated, active" : domain.ssl === "none" ? "Not needed on LAN" : domain.ssl === "failed" ? "Not issued" : "Pending"}</dd></div>
-                      <div><dt>Verified</dt><dd>{domain.verifiedAt ? formatRelative(domain.verifiedAt, now) : "Not yet"}</dd></div>
-                    </dl>
-                    {domain.error ? <p className="mt-3 text-xs text-[var(--status-danger)]">{domain.error}</p> : null}
-                    {domain.records.length ? (
-                      <ul className="dns-records">
+                  <div className="domain-body">
+                    <div className="domain-progress">
+                      <p className="domain-label">Setup progress <span>{steps.filter((step) => step.done).length}/{steps.length}</span></p>
+                      <ol className="domain-checklist">
+                        {steps.map((step, index) => {
+                          const next = !step.done && steps.slice(0, index).every((item) => item.done)
+                          return (
+                            <li key={step.label} data-state={step.done ? "done" : next ? "current" : "todo"}>
+                              <span className="domain-check" aria-hidden>{step.done ? <Check /> : index + 1}</span>
+                              <span className="min-w-0"><strong>{step.label}</strong><small>{step.done ? "Complete" : next ? (domain.status === "invalid" ? "Needs attention" : "In progress") : "Waiting"}</small></span>
+                            </li>
+                          )
+                        })}
+                      </ol>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="domain-label">Details</p>
+                      <dl className="domain-facts-grid">
+                        <div><dt><ArrowRightLeft aria-hidden />Routes to</dt><dd>{project?.name ?? "—"}<code className="table-code">:{domain.targetPort}</code></dd></div>
+                        <div><dt><Lock aria-hidden />Certificate</dt><dd><span className="domain-dot" data-tone={domain.ssl === "simulated-active" ? "success" : domain.ssl === "failed" ? "danger" : domain.ssl === "none" ? "neutral" : "warning"} />{domain.ssl === "simulated-active" ? "Active (simulated)" : domain.ssl === "none" ? "Not needed on LAN" : domain.ssl === "failed" ? "Not issued" : "Pending"}</dd></div>
+                        <div><dt><ShieldCheck aria-hidden />Verified</dt><dd>{domain.verifiedAt ? formatRelative(domain.verifiedAt, now) : "Not yet"}</dd></div>
+                        <div><dt><Clock aria-hidden />Added</dt><dd>{formatRelative(domain.createdAt, now)}</dd></div>
+                      </dl>
+                      {domain.error ? <p className="domain-error"><CircleAlert aria-hidden />{domain.error}</p> : null}
+                    </div>
+                  </div>
+                  {domain.records.length ? (
+                    <div className="domain-dns">
+                      <p className="domain-label">DNS records <span>Add these at your DNS provider</span></p>
+                      <div className="domain-dns-table" role="table" aria-label={`DNS records for ${domain.name}`}>
+                        <div className="domain-dns-row domain-dns-head" role="row"><span role="columnheader">Type</span><span role="columnheader">Name</span><span role="columnheader">Value</span><span role="columnheader" className="text-right">Copy</span></div>
                         {domain.records.map((record) => (
-                          <li key={record.type + record.host}>
-                            <Tag tone="info">{record.type}</Tag>
-                            <span className="min-w-0 flex-1"><span className="block truncate font-mono text-[11.5px]">{record.host} → {record.value}</span><span className="block text-[11px] text-faint">{record.purpose}</span></span>
-                            <CopyButton value={record.value} label="Copy" />
-                          </li>
+                          <div key={record.type + record.host} className="domain-dns-row" role="row">
+                            <span role="cell"><Tag tone="info">{record.type}</Tag></span>
+                            <span role="cell" className="min-w-0"><code>{record.host}</code><small>{record.purpose}</small></span>
+                            <span role="cell" className="min-w-0"><code>{record.value}</code></span>
+                            <span role="cell" className="text-right"><CopyButton value={record.value} label="Copy" /></span>
+                          </div>
                         ))}
-                      </ul>
-                    ) : null}
-                    <div className="mt-4 flex gap-2">
+                      </div>
+                    </div>
+                  ) : null}
+                  <div className="domain-actions">
+                    <span className="text-xs text-faint">{domain.kind === "public" ? "Public hostnames need DNS and a certificate. Phase 1 simulates both." : "Private .local names resolve on your LAN only."}</span>
+                    <span className="flex gap-2">
                       {domain.kind === "public" && domain.status !== "active" ? (
                         <Button variant="primary" size="sm" onClick={() => void deploy.verifyDomain(domain.id).then(() => toast({ title: domain.status === "invalid" ? "Verification restarted" : "Verification started", description: domain.name }))}>
-                          {domain.status === "invalid" ? "Verify again" : "Verify"}
+                          <RefreshCw aria-hidden />{domain.status === "invalid" ? "Verify again" : "Verify"}
                         </Button>
                       ) : null}
-                      <Button variant="danger" size="sm" onClick={() => setRemove(domain.id)}>Remove</Button>
-                    </div>
+                      <Button variant="danger" size="sm" onClick={() => setRemove(domain.id)}><Trash2 aria-hidden />Remove</Button>
+                    </span>
                   </div>
                 </li>
               )

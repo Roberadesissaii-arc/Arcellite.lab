@@ -1,26 +1,28 @@
 "use client"
 
-import { ExternalLink, MoreHorizontal } from "lucide-react"
+import { Code2, GitBranch, Globe2, KeyRound, LayoutDashboard, MoreHorizontal, Rocket, RotateCcw, Settings, Terminal, Zap } from "lucide-react"
+import { Tag } from "@/components/ui/kit"
+import { FRAMEWORKS } from "@/lib/deploy/detect"
 import Link from "next/link"
 import { useParams, usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Button, IconButton } from "@/components/ui/button"
-import { copyText, EmptyState, PageSkeleton } from "@/components/ui/bits"
+import { EmptyState, PageSkeleton } from "@/components/ui/bits"
 import { ConfirmDialog, Menu, MenuItem, MenuSeparator } from "@/components/ui/overlays"
 import { DeploymentStatusView } from "@/components/ui/status"
 import { useToast } from "@/components/ui/toast"
 import { DeployError } from "@/lib/deploy/types"
-import { latestDeployment, projectBadge, projectEndpoint } from "@/lib/deploy/helpers"
+import { latestDeployment, projectBadge, sourceText } from "@/lib/deploy/helpers"
 import { useDeploy, useDeployState } from "@/lib/deploy/react"
 import { useNow } from "@/lib/use-now"
 
 const TABS = [
-  { href: "", label: "Overview" },
-  { href: "/deployments", label: "Deployments" },
-  { href: "/logs", label: "Logs" },
-  { href: "/environment", label: "Environment" },
-  { href: "/domains", label: "Domains" },
-  { href: "/settings", label: "Settings" },
+  { href: "", label: "Overview", icon: LayoutDashboard },
+  { href: "/deployments", label: "Deployments", icon: Rocket },
+  { href: "/logs", label: "Logs", icon: Terminal },
+  { href: "/environment", label: "Environment", icon: KeyRound },
+  { href: "/domains", label: "Domains", icon: Globe2 },
+  { href: "/settings", label: "Settings", icon: Settings },
 ]
 
 export function ProjectFrame({ children }: { children: React.ReactNode }) {
@@ -47,34 +49,40 @@ export function ProjectFrame({ children }: { children: React.ReactNode }) {
     )
   }
   const latest = latestDeployment(state.deployments, project.id, now)
-  const endpoint = projectEndpoint(project, state.servers[0]?.ip)
   const base = `/projects/${project.id}`
   const githubOff = project.source.type === "github" && !state.github.connected
 
   return (
-    <div className="page page-wide">
-      <div className="page-introduction">
-        <div>
-          <p className="page-kicker">Project overview</p><h1 className="page-title">{project.name}</h1><p className="page-copy mt-2">Manage releases, runtime logs, environment variables, and domains.</p>
-          <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
-            <span className="capitalize text-muted">{project.environment}</span>
-            <DeploymentStatusView value={projectBadge(project, latest)} />
+    <div className="page page-wide page-stack project-page">
+      <header className="page-introduction project-hero">
+        <div className="page-introduction-main">
+          <span className="page-introduction-icon">{project.framework === "fastapi" ? <Zap aria-hidden /> : <Code2 aria-hidden />}</span>
+          <div className="min-w-0">
+            <p className="page-kicker">Project</p>
+            <h1 className="page-title mt-1 font-heading">{project.name}<span className="text-brand">.</span></h1>
+            <p className="page-copy mt-2">{sourceText(project)}</p>
+            <div className="project-hero-meta">
+              <DeploymentStatusView value={projectBadge(project, latest)} />
+              <Tag tone={project.environment === "production" ? "brand" : project.environment === "preview" ? "info" : "neutral"}><span className="capitalize">{project.environment}</span></Tag>
+              <Tag>{FRAMEWORKS[project.framework].label}</Tag>
+              {project.branch ? <Tag><GitBranch size={11} aria-hidden />{project.branch}</Tag> : null}
+            </div>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm text-muted">{endpoint}</span>
+        <div className="page-introduction-actions">
           <Button
-            variant="secondary"
+            variant="primary"
             onClick={() => {
-              void copyText(endpoint).then((ok) => toast(ok ? { title: "Endpoint copied" } : { title: "Could not copy", tone: "danger" }))
+              void deploy.redeploy(project.id).then(
+                (deployment) => router.push(`/deployments/${deployment.id}`),
+                (error: unknown) => {
+                  if (error instanceof DeployError) toast({ title: error.title, description: error.detail, tone: "danger" })
+                },
+              )
             }}
           >
-            Copy
+            <RotateCcw aria-hidden />Redeploy
           </Button>
-          <a className="btn btn-primary" href={endpoint} target="_blank" rel="noreferrer">
-            Visit
-            <ExternalLink aria-hidden />
-          </a>
           <Menu
             trigger={
               <IconButton label="Project actions">
@@ -82,25 +90,14 @@ export function ProjectFrame({ children }: { children: React.ReactNode }) {
               </IconButton>
             }
           >
-            <MenuItem
-              onSelect={() => {
-                void deploy.redeploy(project.id).then(
-                  (deployment) => router.push(`/deployments/${deployment.id}`),
-                  (error: unknown) => {
-                    if (error instanceof DeployError) toast({ title: error.title, description: error.detail, tone: "danger" })
-                  },
-                )
-              }}
-            >
-              Redeploy
-            </MenuItem>
             <MenuItem onSelect={() => router.push(`${base}/logs`)}>View logs</MenuItem>
+            <MenuItem onSelect={() => router.push(`${base}/environment`)}>Environment variables</MenuItem>
             <MenuItem onSelect={() => router.push(`${base}/settings`)}>Settings</MenuItem>
             <MenuSeparator />
             <MenuItem danger onSelect={() => setRemove(true)}>Delete</MenuItem>
           </Menu>
         </div>
-      </div>
+      </header>
       {githubOff ? (
         <p className="mt-4 text-sm text-[var(--status-warning)]">
           Repository access lost for {project.source.type === "github" ? project.source.fullName : "this source"}. Reconnect GitHub in Settings to deploy again.
@@ -109,18 +106,19 @@ export function ProjectFrame({ children }: { children: React.ReactNode }) {
       {project.runtime === "stopped" && latest?.status === "ready" ? (
         <p className="mt-4 text-sm text-muted">The latest release is ready, but the web container is stopped.</p>
       ) : null}
-      <nav className="mt-6 flex gap-1 overflow-auto border-b border-[var(--border-subtle)]" aria-label="Project">
+      <nav className="project-tabs" aria-label="Project">
         {TABS.map((tab) => {
           const href = `${base}${tab.href}`
           const active = tab.href === "" ? pathname === base : pathname.startsWith(href)
+          const Icon = tab.icon
           return (
-            <Link key={tab.label} href={href} aria-current={active ? "page" : undefined} className="border-b-2 px-3 py-2 text-sm" style={{ borderColor: active ? "var(--brand-primary)" : "transparent", fontWeight: active ? 600 : 500, color: active ? "var(--text-primary)" : "var(--text-secondary)" }}>
-              {tab.label}
+            <Link key={tab.label} href={href} aria-current={active ? "page" : undefined} className="project-tab">
+              <Icon aria-hidden />{tab.label}
             </Link>
           )
         })}
       </nav>
-      <div className="pt-6">{children}</div>
+      <div className="pt-5">{children}</div>
       <ConfirmDialog
         open={remove}
         title={`Delete ${project.name}?`}
