@@ -107,6 +107,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
 function crumbLabel(pathname: string): string {
   if (pathname === "/") return "Overview"
+  if (pathname.startsWith("/projects/new/")) return "New project"
   const map: Record<string, string> = {
     "/chat": "Ask Arc",
     "/projects": "Projects",

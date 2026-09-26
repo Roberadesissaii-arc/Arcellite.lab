@@ -1,14 +1,14 @@
 "use client"
 
-import { Code2, GitBranch, Globe2, KeyRound, LayoutDashboard, MoreHorizontal, Rocket, RotateCcw, Settings, Terminal, Zap } from "lucide-react"
+import { Code2, GitBranch, Globe2, KeyRound, LayoutDashboard, Rocket, RotateCcw, Settings, Terminal, Zap } from "lucide-react"
+import { motion, useReducedMotion } from "motion/react"
 import { Tag } from "@/components/ui/kit"
 import { FRAMEWORKS } from "@/lib/deploy/detect"
 import Link from "next/link"
 import { useParams, usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { Button, IconButton } from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
 import { EmptyState, PageSkeleton } from "@/components/ui/bits"
-import { ConfirmDialog, Menu, MenuItem, MenuSeparator } from "@/components/ui/overlays"
 import { DeploymentStatusView } from "@/components/ui/status"
 import { useToast } from "@/components/ui/toast"
 import { DeployError } from "@/lib/deploy/types"
@@ -33,7 +33,13 @@ export function ProjectFrame({ children }: { children: React.ReactNode }) {
   const now = useNow()
   const toast = useToast()
   const router = useRouter()
-  const [remove, setRemove] = useState(false)
+  const reduced = useReducedMotion()
+  const tabBase = `/projects/${params.projectId}`
+  const activeIndex = Math.max(0, TABS.findIndex((tab) => (tab.href === "" ? pathname === tabBase : pathname.startsWith(`${tabBase}${tab.href}`))))
+  // Content slides in from the side of the tab you came from.
+  const [tabMotion, setTabMotion] = useState({ index: activeIndex, direction: 0 })
+  if (tabMotion.index !== activeIndex) setTabMotion({ index: activeIndex, direction: activeIndex > tabMotion.index ? 1 : -1 })
+  const direction = tabMotion.direction
   const project = state?.projects.find((item) => item.id === params.projectId)
 
   useEffect(() => {
@@ -83,19 +89,6 @@ export function ProjectFrame({ children }: { children: React.ReactNode }) {
           >
             <RotateCcw aria-hidden />Redeploy
           </Button>
-          <Menu
-            trigger={
-              <IconButton label="Project actions">
-                <MoreHorizontal />
-              </IconButton>
-            }
-          >
-            <MenuItem onSelect={() => router.push(`${base}/logs`)}>View logs</MenuItem>
-            <MenuItem onSelect={() => router.push(`${base}/environment`)}>Environment variables</MenuItem>
-            <MenuItem onSelect={() => router.push(`${base}/settings`)}>Settings</MenuItem>
-            <MenuSeparator />
-            <MenuItem danger onSelect={() => setRemove(true)}>Delete</MenuItem>
-          </Menu>
         </div>
       </header>
       {githubOff ? (
@@ -107,32 +100,27 @@ export function ProjectFrame({ children }: { children: React.ReactNode }) {
         <p className="mt-4 text-sm text-muted">The latest release is ready, but the web container is stopped.</p>
       ) : null}
       <nav className="project-tabs" aria-label="Project">
-        {TABS.map((tab) => {
+        {TABS.map((tab, index) => {
           const href = `${base}${tab.href}`
-          const active = tab.href === "" ? pathname === base : pathname.startsWith(href)
           const Icon = tab.icon
+          const current = index === activeIndex
           return (
-            <Link key={tab.label} href={href} aria-current={active ? "page" : undefined} className="project-tab">
-              <Icon aria-hidden />{tab.label}
+            <Link key={tab.label} href={href} aria-current={current ? "page" : undefined} className="project-tab">
+              {current ? <motion.span layoutId="project-tab-pill" className="project-tab-pill" transition={reduced ? { duration: 0 } : { type: "spring", bounce: 0, duration: 0.36 }} /> : null}
+              <span className="project-tab-label"><Icon aria-hidden />{tab.label}</span>
             </Link>
           )
         })}
       </nav>
-      <div className="pt-5">{children}</div>
-      <ConfirmDialog
-        open={remove}
-        title={`Delete ${project.name}?`}
-        body="This removes the project from the control plane. Phase 1 does not stop a real container."
-        confirmLabel="Delete project"
-        danger
-        onOpenChange={setRemove}
-        onConfirm={() => {
-          void deploy.deleteProject(project.id).then(() => {
-            toast({ title: "Project deleted" })
-            router.push("/projects")
-          })
-        }}
-      />
+      <motion.div
+        key={pathname}
+        className="project-tab-body"
+        initial={reduced ? { opacity: 0 } : { opacity: 0, x: direction * 18 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={reduced ? { duration: 0.15 } : { type: "spring", bounce: 0, duration: 0.36 }}
+      >
+        {children}
+      </motion.div>
     </div>
   )
 }

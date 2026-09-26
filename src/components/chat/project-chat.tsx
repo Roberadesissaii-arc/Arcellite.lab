@@ -6,7 +6,7 @@ import * as Dialog from "@radix-ui/react-dialog"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import { springSheet } from "@/lib/motion"
 import { formatRelative } from "@/lib/deploy/format"
-import { Activity, ArrowUp, ArrowUpRight, Globe2, History, Info, Layers, MessageSquare, Server, Sparkle, Trash2, TriangleAlert, X, type LucideIcon } from "lucide-react"
+import { Activity, ArrowUp, ArrowUpRight, Globe2, History, Info, Layers, MessageSquare, Server, Sparkle, SquarePen, Trash2, TriangleAlert, X, type LucideIcon } from "lucide-react"
 import { useDeployState } from "@/lib/deploy/react"
 import { answerProjectQuestion, type AssistantReply } from "@/lib/deploy/assistant"
 import { formatReply } from "@/lib/deploy/assistant-format"
@@ -111,8 +111,9 @@ function ChatSession() {
         <p><span className="chat-live-dot" />Workspace assistant · Local, Phase 1</p>
       </div>
       <div className="chat-header-actions">
-        <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setHistoryOpen(true)}><History aria-hidden /><span>History</span>{history.length ? <span className="chat-history-count">{history.length}</span> : null}</button>
-        <button type="button" className="btn btn-ghost btn-sm" disabled={!messages.length} onClick={newChat} title="Saves this conversation to History and starts a new one"><Trash2 aria-hidden /><span>Clear</span></button>
+        <button type="button" className="chat-action" onClick={()=>setHistoryOpen(true)}><History aria-hidden /><span>History</span>{history.length ? <span className="chat-history-count">{history.length}</span> : null}</button>
+        <span className="chat-action-sep" aria-hidden />
+        <button type="button" className="chat-action" disabled={!messages.length} onClick={newChat} title="Saves this conversation to History and starts a new one"><SquarePen aria-hidden /><span>New chat</span></button>
       </div>
     </header>
 
