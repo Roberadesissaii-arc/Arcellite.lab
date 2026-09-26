@@ -4,10 +4,11 @@ import { useState } from "react"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { copyText, PageSkeleton } from "@/components/ui/bits"
-import { EmptyPanel, IconTile, SectionHeading, SegmentMeter, StatCard, StatGrid, Tag } from "@/components/ui/kit"
+import { EmptyPanel, IconTile, SearchField, SectionHeading, SegmentMeter, StatCard, StatGrid, Tag } from "@/components/ui/kit"
 import { formatRelative } from "@/lib/deploy/format"
 import { useNow } from "@/lib/use-now"
-import { CirclePlay, Database, HardDrive, KeyRound, Zap } from "lucide-react"
+import { CirclePlay, Database, HardDrive, KeyRound, SearchX, Zap } from "lucide-react"
+import { SelectInput } from "@/components/ui/fields"
 import { Modal } from "@/components/ui/overlays"
 import { useToast } from "@/components/ui/toast"
 import { useDeployState } from "@/lib/deploy/react"
@@ -25,10 +26,20 @@ export function DatabasesView() {
   const now = useNow()
   const [id, setId] = useState<string | null>(null)
   const [revealed, setRevealed] = useState(false)
+  const [search, setSearch] = useState("")
+  const [engine, setEngine] = useState("all")
+  const [status, setStatus] = useState("all")
   if (!state) return <PageSkeleton />
   const selected = state.databases.find((database) => database.id === id) ?? null
   const running = state.databases.filter((database) => database.status === "running").length
   const storage = Math.round(state.databases.reduce((sum, database) => sum + database.storageGb, 0) * 10) / 10
+  const q = search.trim().toLowerCase()
+  const rows = state.databases.filter((database) => {
+    const project = state.projects.find((item) => item.id === database.projectId)
+    return (engine === "all" || database.engine === engine)
+      && (status === "all" || database.status === status)
+      && (!q || [database.name, database.host, project?.name ?? ""].some((text) => text.toLowerCase().includes(q)))
+  })
   const engines = new Set(state.databases.map((database) => database.engine)).size
   return (
     <div className="page page-stack">
@@ -40,10 +51,22 @@ export function DatabasesView() {
         <StatCard icon={KeyRound} tone="neutral" label="Credentials" value={state.databases.filter((database) => database.password).length} detail="Hidden by default" />
       </StatGrid>
       <section>
-        <SectionHeading title="Services" count={state.databases.length} />
-        {state.databases.length === 0 ? <EmptyPanel icon={Database} title="No databases" body="Data services you add will appear here." /> : (
+        <SectionHeading title="Services" count={rows.length} />
+        <div className="page-toolbar mb-3">
+          <SearchField value={search} onChange={setSearch} placeholder="Search by name, host, or project" label="Search databases" />
+          <SelectInput aria-label="Engine" value={engine} onChange={(event) => setEngine(event.target.value)}>
+            <option value="all">All engines</option>
+            {(Object.keys(ENGINE) as DatabaseService["engine"][]).map((key) => <option key={key} value={key}>{ENGINE[key]}</option>)}
+          </SelectInput>
+          <SelectInput aria-label="Status" value={status} onChange={(event) => setStatus(event.target.value)}>
+            <option value="all">All statuses</option>
+            <option value="running">Running</option>
+            <option value="stopped">Stopped</option>
+          </SelectInput>
+        </div>
+        {state.databases.length === 0 ? <EmptyPanel icon={Database} title="No databases" body="Data services you add will appear here." /> : rows.length === 0 ? <EmptyPanel icon={SearchX} title="No databases match" body="Try another engine, status, or search." /> : (
           <ul className="space-y-4">
-            {state.databases.map((database) => {
+            {rows.map((database) => {
               const project = state.projects.find((item) => item.id === database.projectId)
               const container = state.containers.find((item) => item.id === database.containerId)
               const server = state.servers.find((item) => item.id === database.serverId)

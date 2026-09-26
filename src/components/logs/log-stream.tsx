@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { ArrowDownToLine, Copy, Download, Pause, Play, TerminalSquare } from "lucide-react"
+import { ArrowDown, ArrowDownToLine, Copy, Download, Pause, Play, TerminalSquare } from "lucide-react"
 import { copyText } from "@/components/ui/bits"
 import { SelectInput } from "@/components/ui/fields"
 import { SearchField } from "@/components/ui/kit"
@@ -46,6 +46,7 @@ export function LogStream({
   const [follow, setFollow] = useState(true)
   const [chosen, setChosen] = useState(`${target}:${id ?? ""}`)
   const streamRef = useRef<HTMLDivElement>(null)
+  const [atBottom, setAtBottom] = useState(true)
 
   const resolved = useMemo(() => {
     const [kind, value] = chosen.split(":")
@@ -137,7 +138,20 @@ export function LogStream({
             </button>
           </span>
         </div>
-        <div ref={streamRef} className="log-surface log-stream" role="log" aria-live={paused ? "off" : "polite"}>
+        <div className="log-stream-wrap">
+        <div
+          ref={streamRef}
+          className="log-surface log-stream"
+          role="log"
+          tabIndex={0}
+          aria-live={paused ? "off" : "polite"}
+          onScroll={(event) => {
+            const el = event.currentTarget
+            const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < 24
+            setAtBottom(bottom)
+            setFollow(bottom)
+          }}
+        >
           {rows.length === 0 ? <p className="log-empty">No log lines match. Try another level or search.</p> : null}
           {rows.map((row, index) => (
             <div key={row.id} className="log-row" data-level={row.level}>
@@ -148,6 +162,21 @@ export function LogStream({
               <span className="log-msg">{row.message}</span>
             </div>
           ))}
+        </div>
+        {!atBottom ? (
+          <button
+            type="button"
+            className="log-jump pressable"
+            aria-label="Jump to the newest line"
+            onClick={() => {
+              const el = streamRef.current
+              if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" })
+              setFollow(true)
+            }}
+          >
+            <ArrowDown aria-hidden />
+          </button>
+        ) : null}
         </div>
         <div className="log-window-foot">
           <span>{rows.length} lines</span>

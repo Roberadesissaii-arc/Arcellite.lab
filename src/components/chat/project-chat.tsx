@@ -7,6 +7,7 @@ import { useDeployState } from "@/lib/deploy/react"
 import { answerProjectQuestion, type AssistantReply } from "@/lib/deploy/assistant"
 import { useNow } from "@/lib/use-now"
 import { PageSkeleton } from "@/components/ui/bits"
+import { SelectInput } from "@/components/ui/fields"
 
 type Message = { role: "user" | "assistant"; text: string; links?: AssistantReply['links'] }
 const KEY = 'arcellite-project-chat-v1'
@@ -93,11 +94,10 @@ function ChatSession() {
         <label className="sr-only" htmlFor="project-question">Ask {ASSISTANT} about your projects</label>
         <textarea id="project-question" rows={1} value={question} maxLength={1000} onChange={e=>setQuestion(e.target.value)} onKeyDown={e=>{ if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(question) } }} placeholder={`Ask ${ASSISTANT} about your projects…`} autoComplete="off"/>
         <div className="chat-composer-bar">
-          <label className="chat-context">
+          <span className="chat-context">
             <Layers aria-hidden />
-            <span className="sr-only">Context</span>
-            <select value={projectId} onChange={e=>setProjectId(e.target.value)}><option value="all">All projects</option>{state.projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>
-          </label>
+            <SelectInput aria-label="Context" value={projectId} onChange={e=>setProjectId(e.target.value)}><option value="all">All projects</option>{state.projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</SelectInput>
+          </span>
           <button type="submit" className="btn btn-primary chat-send pressable" aria-label="Send question" disabled={!question.trim()}><ArrowUp aria-hidden/></button>
         </div>
       </form>

@@ -52,7 +52,7 @@ export function DeploymentsView() {
           </SelectInput>
           <SelectInput aria-label="Status" value={status} onChange={(event) => setStatus(event.target.value as DeploymentStatus | "all")}>
             <option value="all">All statuses</option>
-            {["queued", "preparing", "building", "deploying", "ready", "failed", "canceled", "stopped"].map((item) => <option key={item} value={item} className="capitalize">{item}</option>)}
+            {["queued", "preparing", "building", "deploying", "ready", "failed", "canceled", "stopped"].map((item) => <option key={item} value={item}>{item.charAt(0).toUpperCase() + item.slice(1)}</option>)}
           </SelectInput>
         </div>
         <div className="mt-3">

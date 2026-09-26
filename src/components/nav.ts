@@ -67,7 +67,6 @@ export const NAV_GROUPS: { id: string; label: string; items: NavItem[] }[] = [
       { href: "/chat", label: "Ask Arc", icon: Sparkle, animated: SparklesIcon },
       { href: "/projects", label: "Projects", icon: Files, animated: FolderKanbanIcon },
       { href: "/deployments", label: "Deployments", icon: PackagePlus, animated: RocketIcon },
-      { href: "/environment", label: "Environment", icon: KeyRound, animated: KeySquareIcon },
     ],
   },
   {
@@ -86,6 +85,7 @@ export const NAV_GROUPS: { id: string; label: string; items: NavItem[] }[] = [
     label: "Observe",
     items: [
       { href: "/logs", label: "Logs", icon: Terminal, animated: TerminalIcon },
+      { href: "/environment", label: "Environment", icon: KeyRound, animated: KeySquareIcon },
       { href: "/jobs", label: "Jobs", icon: Workflow, animated: WorkflowIcon },
       { href: "/alerts", label: "Alerts", icon: ShieldCheck, animated: ShieldCheckIcon },
       { href: "/events", label: "Events", icon: GalleryVerticalEnd, animated: GalleryVerticalEndIcon },

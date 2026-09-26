@@ -71,7 +71,7 @@ export function EnvironmentView() {
     <div className="page page-wide page-stack">
       <PageHeader
         icon={KeyRound}
-        kicker="Workspace"
+        kicker="Observe"
         title="Environment"
         description="Variables and secrets for every project, kept apart from source code. Secrets stay masked and are injected only when a container starts."
         actions={project ? <Button variant="primary" onClick={() => { setError(null); setDraft({ key: "", value: "", scope: "all", secret: true }); setAdding(true) }}><Plus aria-hidden />Add variable</Button> : null}
