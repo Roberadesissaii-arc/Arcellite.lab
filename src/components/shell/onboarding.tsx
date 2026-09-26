@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { Upload } from "lucide-react"
+import { Rocket, Server, Upload } from "lucide-react"
 import { useState } from "react"
 import { GitHubMark } from "@/components/brand"
 import { Button } from "@/components/ui/button"
@@ -24,6 +24,7 @@ export function Onboarding() {
 
   return (
     <Modal
+      icon={step === 0 ? Rocket : step === 1 ? Server : Upload}
       open
       onOpenChange={(open) => {
         if (!open) void finish()
@@ -57,14 +58,14 @@ export function Onboarding() {
       ) : null}
       {step === 2 ? (
         <div className="grid gap-2">
-          <button type="button" className="choice source-choice" onClick={() => void finish("/projects/new?source=github")}>
+          <button type="button" className="choice source-choice" onClick={() => void finish("/projects/new/github")}>
             <GitHubMark className="mt-0.5 h-5 w-5" />
             <span>
               <span className="block font-semibold">GitHub</span>
               <span className="text-sm text-muted">Import a repository from Roberadesissaii.</span>
             </span>
           </button>
-          <button type="button" className="choice source-choice" onClick={() => void finish("/projects/new?source=upload")}>
+          <button type="button" className="choice source-choice" onClick={() => void finish("/projects/new/upload")}>
             <Upload className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
             <span>
               <span className="block font-semibold">Upload</span>
@@ -73,7 +74,7 @@ export function Onboarding() {
           </button>
         </div>
       ) : null}
-      <div className="mt-6 flex items-center justify-between">
+      <div className="dialog-actions" data-split>
         <button type="button" className="btn btn-ghost" onClick={() => void finish()}>
           Skip
         </button>

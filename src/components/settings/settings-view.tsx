@@ -16,6 +16,7 @@ import { formatRelative } from "@/lib/deploy/format"
 import { useDeploy, useDeployState } from "@/lib/deploy/react"
 import type { EnvironmentName, MotionChoice, Settings as SettingsShape } from "@/lib/deploy/types"
 import { useNow } from "@/lib/use-now"
+import { setToastPrefs, useToastPrefs, type ToastPosition, type ToastStyle } from "@/lib/toast-prefs"
 
 const SECTIONS = ["General", "Appearance", "Notifications", "Git providers", "Deployment defaults", "Security", "Server agent", "Advanced"] as const
 type Section = (typeof SECTIONS)[number]
@@ -144,6 +145,7 @@ export function SettingsView() {
             </> : null}
 
             {section === "Notifications" ? <>
+              <ToastSettings onTest={() => toast({ title: "This is how pop-ups look", description: "Deployments, refreshes, and copies confirm here." })} />
               <Group title="Deployments">
                 <Row label="Deployment succeeded" hint="A release finished its health check and is serving."><Toggle label="Deployment succeeded" checked={settings.notifyDeploySuccess} onChange={(value) => set({ notifyDeploySuccess: value })} /></Row>
                 <Row label="Deployment failed" hint="A build or health check failed. Recommended."><Toggle label="Deployment failed" checked={settings.notifyDeployFailure} onChange={(value) => set({ notifyDeployFailure: value })} /></Row>
@@ -307,5 +309,48 @@ export function SettingsView() {
         }}
       />
     </div>
+  )
+}
+
+const TOAST_POSITIONS: { value: ToastPosition; label: string }[] = [
+  { value: "top-center", label: "Top center" },
+  { value: "top-right", label: "Top right" },
+  { value: "bottom-left", label: "Bottom left" },
+  { value: "bottom-center", label: "Bottom center" },
+  { value: "bottom-right", label: "Bottom right" },
+]
+const TOAST_STYLES: { value: ToastStyle; label: string; body: string }[] = [
+  { value: "light", label: "Light", body: "White card with a soft shadow." },
+  { value: "dark", label: "Dark", body: "High contrast, matches the sidebar." },
+  { value: "brand", label: "Purple", body: "Brand colour, hard to miss." },
+]
+
+function ToastSettings({ onTest }: { onTest: () => void }) {
+  const prefs = useToastPrefs()
+  return (
+    <Group title="Pop-up messages" footer={<Button variant="secondary" size="sm" onClick={onTest}><Bell aria-hidden />Show a test pop-up</Button>}>
+      <div className="toast-pref">
+        <div className="toast-pref-screen" role="radiogroup" aria-label="Pop-up position">
+          <span className="toast-pref-side" aria-hidden />
+          {TOAST_POSITIONS.map((item) => (
+            <button key={item.value} type="button" role="radio" aria-checked={prefs.position === item.value} aria-label={item.label} title={item.label} data-spot={item.value} className="toast-pref-spot" onClick={() => setToastPrefs({ position: item.value })}>
+              <i data-style={prefs.style} />
+            </button>
+          ))}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="setting-label">Position</p>
+          <p className="setting-hint">Pick a corner on the preview. Currently <strong>{TOAST_POSITIONS.find((item) => item.value === prefs.position)?.label.toLowerCase()}</strong>.</p>
+          <div className="choice-cards mt-4" role="radiogroup" aria-label="Pop-up style">
+            {TOAST_STYLES.map((item) => (
+              <button key={item.value} type="button" role="radio" aria-checked={prefs.style === item.value} className="choice-card pressable" onClick={() => setToastPrefs({ style: item.value })}>
+                <span className="toast-pref-swatch" data-style={item.value} aria-hidden><i /><b /></span>
+                <strong>{item.label}</strong><small>{item.body}</small>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </Group>
   )
 }

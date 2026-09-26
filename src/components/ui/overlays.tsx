@@ -4,7 +4,7 @@ import { AlertTriangle, CircleHelp, X, type LucideIcon } from "lucide-react"
 import * as Dialog from "@radix-ui/react-dialog"
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
-import { springFast, springSheet } from "@/lib/motion"
+import { springFast, springSnappy } from "@/lib/motion"
 import { cn } from "@/lib/cn"
 import { Button } from "./button"
 
@@ -60,7 +60,7 @@ export function Modal({
                   initial={reduced ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={reduced ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.98 }}
-                  transition={reduced ? { duration: 0.12 } : springSheet}
+                  transition={reduced ? { duration: 0.12 } : springSnappy}
                 >
                   <header className="dialog-head">
                     {Icon ? <span className="dialog-icon" data-tone={tone}><Icon aria-hidden /></span> : null}

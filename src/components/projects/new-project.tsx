@@ -6,7 +6,7 @@ import { useForm, useWatch } from "react-hook-form"
 import { z } from "zod"
 import Link from "next/link"
 import { ArrowRight, Check, Container, FileArchive, FolderGit2, FolderUp, GitBranch, Layers, Lock, Rocket, ScanSearch, Server, SlidersHorizontal, Upload, X } from "lucide-react"
-import { IconTile, SectionHeading, Tag } from "@/components/ui/kit"
+import { IconTile, SearchField, SectionHeading, Tag } from "@/components/ui/kit"
 import { GitHubMark } from "@/components/brand"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
@@ -23,11 +23,12 @@ import {
   FRAMEWORKS,
   FRAMEWORK_ORDER,
 } from "@/lib/deploy/detect"
-import { formatBytes, formatGb } from "@/lib/deploy/format"
+import { formatBytes, formatGb, formatRelative } from "@/lib/deploy/format"
 import { ServerStatusView } from "@/components/ui/status"
 import { homeServer, nextFreePort, portTaken } from "@/lib/deploy/helpers"
 import { useDeploy, useDeployState } from "@/lib/deploy/react"
-import { useReducedMotion } from "motion/react"
+import { AnimatePresence, motion, useReducedMotion } from "motion/react"
+import { useNow } from "@/lib/use-now"
 import { DeployError, type AnalysisResult, type EnvironmentVariable, type Framework, type GitRepository, type ProjectSource } from "@/lib/deploy/types"
 
 const STEPS: { label: string; stages: string[] }[] = [
@@ -59,17 +60,19 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 type Stage = "choose" | "github" | "upload" | "git" | "image" | "compose" | "analyze" | "configure"
+const LANGUAGE_COLOR: Record<string, string> = { TypeScript: "#3178c6", JavaScript: "#f1e05a", Python: "#3572a5", HTML: "#e34c26", Go: "#00add8", Rust: "#dea584" }
 const SOURCE_STAGES: Stage[] = ["choose", "github", "upload", "git", "image", "compose"]
 
-export function NewProjectView() {
+export function NewProjectView({ source: routeSource }: { source?: string } = {}) {
   const state = useDeployState()
   const deploy = useDeploy()
   const router = useRouter()
   const params = useSearchParams()
   const toast = useToast()
   const reduced = useReducedMotion()
-  const initial = params.get("source")
-  // Source screens live in the URL (?source=upload) so Back and the browser
+  const now = useNow()
+  const initial = routeSource ?? params.get("source")
+  // Source screens live in the URL (/projects/new/upload) so Back and the browser
   // back button return to the source picker; analyze/configure are in-page.
   const sourceStage: Stage = SOURCE_STAGES.includes(initial as Stage) ? (initial as Stage) : "choose"
   const [flow, setFlow] = useState<{ stage: "analyze" | "configure"; from: string | null } | null>(null)
@@ -81,9 +84,10 @@ export function NewProjectView() {
     }
     setFlow(null)
     if (next === sourceStage) return
-    router.push(next === "choose" ? "/projects/new" : `/projects/new?source=${next}`)
+    router.push(next === "choose" ? "/projects/new" : `/projects/new/${next}`)
   }
   const [repoQuery, setRepoQuery] = useState("")
+  const [repoFilter, setRepoFilter] = useState<"all" | "public" | "private">("all")
   const [repo, setRepo] = useState<GitRepository | null>(null)
   const [branch, setBranch] = useState("main")
   const [upload, setUpload] = useState<{ name: string; size: number; progress: number; error: string | null } | null>(null)
@@ -144,6 +148,7 @@ export function NewProjectView() {
   }, [state, repoQuery])
 
   if (!state) return <PageSkeleton variant="detail" />
+  const shownRepos = repos.filter((item) => repoFilter === "all" || (repoFilter === "private") === item.private)
 
   function beginAnalysis(nextSource: ProjectSource, files: string[], suggestedName: string, suggestedBranch: string | null, environment?: FormValues["environment"]) {
     const result = analysisFromFiles(files)
@@ -359,67 +364,97 @@ export function NewProjectView() {
       ) : null}
 
       {stage === "github" ? (
-        <section>
+        <section className="np-source">
           {!state.github.connected ? (
-            <Button className="mt-6" variant="primary" onClick={() => void deploy.connectGitHub().then(() => toast({ title: "GitHub connected", description: "Roberadesissaii" }))}>
-              Connect GitHub
-            </Button>
+            <div className="np-connect">
+              <span className="np-connect-mark"><GitHubMark className="h-7 w-7" /></span>
+              <h2>Connect GitHub to import a repository</h2>
+              <p>Arcellite reads code and metadata, and reports commit status. No personal access token is stored.</p>
+              <Button variant="primary" onClick={() => void deploy.connectGitHub().then(() => toast({ title: "GitHub connected", description: "Roberadesissaii" }))}><GitHubMark className="h-4 w-4" />Connect GitHub</Button>
+            </div>
           ) : (
             <>
-              <TextInput className="mt-6" value={repoQuery} onChange={(event) => setRepoQuery(event.target.value)} placeholder="Search repositories" aria-label="Search repositories" />
-              <ul className="panel mt-4 divide-y divide-line">
-                {repos.map((item) => (
-                  <li key={item.id}>
-                    <button type="button" className="choice w-full" data-active={repo?.id === item.id || undefined} onClick={() => { setRepo(item); setBranch(item.defaultBranch) }}>
-                      <span className="min-w-0">
-                        <span className="block font-medium">{item.fullName}</span>
-                        <span className="block text-sm text-muted">{item.private ? "Private" : "Public"} · {item.language} · {item.description}</span>
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              {repo ? (
-                <div className="mt-5">
-                  {imported ? (
-                    <p className="mb-3 text-sm text-muted">
-                      This repository is already deployed as {imported.name}. You can open it, or deploy another environment.
-                    </p>
-                  ) : null}
-                  <Field label="Branch">
-                    <SelectInput value={branch} onChange={(event) => setBranch(event.target.value)}>
-                      {repo.branches.map((item) => (
-                        <option key={item}>{item}</option>
-                      ))}
-                    </SelectInput>
-                  </Field>
+              <div className="np-repo-toolbar">
+                <SearchField value={repoQuery} onChange={setRepoQuery} placeholder="Search repositories" label="Search repositories" />
+                <div className="segmented" role="group" aria-label="Visibility">
+                  {(["all", "public", "private"] as const).map((item) => (
+                    <button key={item} type="button" aria-pressed={repoFilter === item} onClick={() => setRepoFilter(item)}>{item === "all" ? "All" : item === "public" ? "Public" : "Private"}</button>
+                  ))}
                 </div>
-              ) : null}
-              <div className="mt-6 flex gap-2">
-                <Button variant="ghost" onClick={() => setStage("choose")}>Back</Button>
-                {imported ? (
-                  <Button variant="secondary" onClick={() => router.push(`/projects/${imported.id}`)}>Open {imported.name}</Button>
-                ) : null}
-                <Button
-                  variant="primary"
-                  disabled={!repo}
-                  onClick={() => {
-                    if (!repo) return
-                    const name = imported ? `${titleFrom(repo.name)} preview` : titleFrom(repo.name)
-                    beginAnalysis(
-                      { type: "github", owner: repo.owner, repo: repo.name, fullName: repo.fullName },
-                      repo.files,
-                      name,
-                      branch,
-                      imported ? "preview" : undefined,
-                    )
-                  }}
-                >
-                  Continue
-                </Button>
               </div>
+              <div className="np-repo-account">
+                <GitHubMark className="h-4 w-4" /><span><strong>{state.github.accountLogin}</strong> · {shownRepos.length} of {state.repositories.length} repositories</span>
+              </div>
+              <ul className="np-repos" role="listbox" aria-label="Repositories">
+                {shownRepos.map((item, index) => {
+                  const selected = repo?.id === item.id
+                  return (
+                    <motion.li key={item.id} initial={reduced ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", bounce: 0, duration: 0.32, delay: reduced ? 0 : index * 0.03 }}>
+                      <button type="button" role="option" aria-selected={selected} className="np-repo" data-selected={selected} onClick={() => { setRepo(item); setBranch(item.defaultBranch) }}>
+                        <span className="np-repo-avatar" aria-hidden>{item.name.slice(0, 1).toUpperCase()}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="np-repo-name">{item.owner}/<strong>{item.name}</strong></span>
+                          <span className="np-repo-desc">{item.description}</span>
+                          <span className="np-repo-meta">
+                            <span><i style={{ background: LANGUAGE_COLOR[item.language] ?? "#a1a1aa" }} aria-hidden />{item.language}</span>
+                            <span><GitBranch aria-hidden />{item.branches.length} branch{item.branches.length === 1 ? "" : "es"}</span>
+                            <span>Updated {formatRelative(item.updatedAt, now)}</span>
+                          </span>
+                        </span>
+                        <span className="np-repo-tags">
+                          {item.importedProjectId ? <Tag tone="info">Deployed</Tag> : null}
+                          <Tag tone={item.private ? "neutral" : "success"}>{item.private ? <Lock aria-hidden className="mr-1 inline h-3 w-3" /> : null}{item.private ? "Private" : "Public"}</Tag>
+                        </span>
+                        <span className="np-repo-check" aria-hidden><Check /></span>
+                      </button>
+                    </motion.li>
+                  )
+                })}
+                {shownRepos.length === 0 ? <li className="np-repo-empty">No repositories match “{repoQuery}”.</li> : null}
+              </ul>
+              <AnimatePresence initial={false}>
+                {repo ? (
+                  <motion.div
+                    key="picked"
+                    className="np-repo-bar"
+                    initial={reduced ? { opacity: 0 } : { opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={reduced ? { opacity: 0 } : { opacity: 0, y: 16 }}
+                    transition={{ type: "spring", bounce: 0, duration: 0.34 }}
+                  >
+                    <span className="np-repo-avatar" aria-hidden>{repo.name.slice(0, 1).toUpperCase()}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="np-repo-bar-title">{repo.fullName}</p>
+                      <p className="np-repo-bar-sub">{imported ? `Already deployed as ${imported.name} — this creates a preview.` : "Arcellite detects the framework on the next step."}</p>
+                    </div>
+                    <div className="np-repo-branch">
+                      <GitBranch aria-hidden />
+                      <SelectInput aria-label="Branch" value={branch} onChange={(event) => setBranch(event.target.value)}>
+                        {repo.branches.map((item) => <option key={item}>{item}</option>)}
+                      </SelectInput>
+                    </div>
+                    {imported ? <Button variant="secondary" onClick={() => router.push(`/projects/${imported.id}`)}>Open {imported.name}</Button> : null}
+                    <Button
+                      variant="primary"
+                      onClick={() => {
+                        const name = imported ? `${titleFrom(repo.name)} preview` : titleFrom(repo.name)
+                        beginAnalysis(
+                          { type: "github", owner: repo.owner, repo: repo.name, fullName: repo.fullName },
+                          repo.files,
+                          name,
+                          branch,
+                          imported ? "preview" : undefined,
+                        )
+                      }}
+                    >
+                      Continue<ArrowRight aria-hidden />
+                    </Button>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
             </>
           )}
+          <Button className="mt-5 self-start" variant="ghost" onClick={() => setStage("choose")}><ArrowRight aria-hidden className="rotate-180" />Choose another source</Button>
         </section>
       ) : null}
 
@@ -514,76 +549,96 @@ export function NewProjectView() {
         </section>
       ) : null}
 
-      {stage === "git" || stage === "image" || stage === "compose" ? (
-        <section>
-          <div className="mt-6">
-            {stage === "git" ? (
-              <Field label="Repository URL" hint="Example: https://github.com/Roberadesissaii/notes-api.git">
-                <TextInput value={gitUrl} onChange={(event) => setGitUrl(event.target.value)} />
-              </Field>
-            ) : null}
-            {stage === "image" ? (
-              <Field label="Image" hint="Example: ghcr.io/acme/api:1.8">
-                <TextInput value={image} onChange={(event) => setImage(event.target.value)} />
-              </Field>
-            ) : null}
-            {stage === "compose" ? (
-              <Field label="Compose file">
-                <TextInput value={composeFile} onChange={(event) => setComposeFile(event.target.value)} />
-              </Field>
-            ) : null}
-          </div>
-          <div className="mt-6 flex gap-2">
-            <Button variant="ghost" onClick={() => setStage("choose")}>Back</Button>
-            <Button
-              variant="primary"
-              onClick={() => {
-                if (stage === "git") {
-                  if (!gitUrl.trim()) return setFormError("Enter a repository URL.")
-                  beginAnalysis({ type: "git", url: gitUrl.trim() }, filesForGitUrl(gitUrl), titleFrom(gitUrl), "main")
-                } else if (stage === "image") {
-                  if (!image.trim()) return setFormError("Enter an image reference.")
-                  beginAnalysis({ type: "image", image: image.trim() }, filesForImage(), titleFrom(image), null)
-                } else {
-                  beginAnalysis({ type: "compose", filename: composeFile || "docker-compose.yml" }, filesForCompose(composeFile), titleFrom(composeFile), null)
-                }
-                setFormError(null)
-              }}
-            >
-              Analyze
-            </Button>
-          </div>
-          {formError ? <p className="field-error mt-3">{formError}</p> : null}
-        </section>
-      ) : null}
+      {stage === "git" || stage === "image" || stage === "compose" ? (() => {
+        const meta = {
+          git: { icon: GitBranch, label: "Repository URL", placeholder: "https://github.com/owner/repo.git", value: gitUrl, set: setGitUrl, examples: ["https://github.com/Roberadesissaii/notes-api.git", "https://gitlab.com/acme/storefront.git", "git@github.com:acme/worker.git"], tips: ["Any public HTTPS or SSH URL", "The default branch is used first", "Private repos need GitHub import"] },
+          image: { icon: Container, label: "Image reference", placeholder: "ghcr.io/acme/api:1.8", value: image, set: setImage, examples: ["ghcr.io/acme/api:1.8", "nginx:1.27-alpine", "docker.io/library/redis:7"], tips: ["Registry, name, and tag", "Pinned tags make rollbacks predictable", "The container port is detected next"] },
+          compose: { icon: Layers, label: "Compose file", placeholder: "docker-compose.yml", value: composeFile, set: setComposeFile, examples: ["docker-compose.yml", "compose.yaml", "deploy/compose.prod.yml"], tips: ["Each service becomes a container", "Named volumes become Storage", "Published ports are allocated for you"] },
+        }[stage]
+        const Icon = meta.icon
+        function analyze() {
+          if (stage === "git") {
+            if (!gitUrl.trim()) return setFormError("Enter a repository URL.")
+            beginAnalysis({ type: "git", url: gitUrl.trim() }, filesForGitUrl(gitUrl), titleFrom(gitUrl), "main")
+          } else if (stage === "image") {
+            if (!image.trim()) return setFormError("Enter an image reference.")
+            beginAnalysis({ type: "image", image: image.trim() }, filesForImage(), titleFrom(image), null)
+          } else {
+            beginAnalysis({ type: "compose", filename: composeFile || "docker-compose.yml" }, filesForCompose(composeFile), titleFrom(composeFile), null)
+          }
+          setFormError(null)
+        }
+        return (
+          <section className="np-source">
+            <form className="np-form-card" onSubmit={(event) => { event.preventDefault(); analyze() }}>
+              <div className="np-form-field">
+                <label htmlFor="np-source-input">{meta.label}</label>
+                <div className="np-form-input" data-error={Boolean(formError)}>
+                  <Icon aria-hidden />
+                  <input id="np-source-input" value={meta.value} onChange={(event) => { meta.set(event.target.value); setFormError(null) }} placeholder={meta.placeholder} autoComplete="off" spellCheck={false} autoFocus />
+                  <Button type="submit" variant="primary" size="sm"><ScanSearch aria-hidden />Analyze</Button>
+                </div>
+                {formError ? <p className="field-error">{formError}</p> : null}
+              </div>
+              <div>
+                <p className="domain-label">Try an example</p>
+                <div className="np-examples">
+                  {meta.examples.map((example) => (
+                    <button key={example} type="button" data-active={meta.value === example} onClick={() => { meta.set(example); setFormError(null) }}><code>{example}</code></button>
+                  ))}
+                </div>
+              </div>
+              <ul className="np-form-tips">
+                {meta.tips.map((tip) => <li key={tip}><Check aria-hidden />{tip}</li>)}
+              </ul>
+            </form>
+            <Button className="mt-5 self-start" variant="ghost" onClick={() => setStage("choose")}><ArrowRight aria-hidden className="rotate-180" />Choose another source</Button>
+          </section>
+        )
+      })() : null}
 
-      {stage === "analyze" && analysis ? (
-        <section>
-          <ul className="mt-8 space-y-2">
-            {analysis.checks.slice(0, reduced ? analysis.checks.length : shownChecks).map((check) => (
-              <li key={check.label} className="flex items-center gap-3 text-sm">
-                <span aria-hidden className={check.ok ? "text-[var(--status-success)]" : "text-[var(--status-danger)]"}>{check.ok ? "✓" : "!"}</span>
-                <span className="font-mono text-[13px]">{check.label}</span>
-              </li>
-            ))}
-          </ul>
-          {(reduced || shownChecks >= analysis.checks.length) ? (
-            <dl className="mt-8 grid gap-3 text-sm">
-              <Row term="Detected" value={FRAMEWORKS[analysis.framework].label} />
-              <Row term="Package manager" value={analysis.packageManager ?? "None"} />
-              <Row term="Build command" value={analysis.buildCommand || "Not set"} />
-              <Row term="Start command" value={analysis.startCommand || "Not set"} />
-              <Row term="Port" value={String(analysis.internalPort)} />
-            </dl>
-          ) : null}
-          <div className="mt-8 flex gap-2">
-            <Button variant="ghost" onClick={() => setStage(source?.type === "github" ? "github" : source?.type === "upload" ? "upload" : "choose")}>Back</Button>
-            <Button variant="primary" disabled={!reduced && shownChecks < analysis.checks.length} onClick={() => setStage("configure")}>
-              Continue
-            </Button>
-          </div>
-        </section>
-      ) : null}
+      {stage === "analyze" && analysis ? (() => {
+        const done = reduced || shownChecks >= analysis.checks.length
+        const visibleChecks = analysis.checks.slice(0, reduced ? analysis.checks.length : shownChecks)
+        return (
+          <section className="np-source">
+            <div className="np-analyze">
+              <div className="np-analyze-head">
+                <span className="np-analyze-orb" data-done={done} aria-hidden>{done ? <Check /> : <ScanSearch />}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="np-analyze-title">{done ? `Looks like ${FRAMEWORKS[analysis.framework].label}` : "Reading your project…"}</p>
+                  <p className="np-analyze-sub">{done ? "Review the detected settings, then configure the deploy." : `${visibleChecks.length} of ${analysis.checks.length} checks`}</p>
+                </div>
+                <span className="np-analyze-count">{visibleChecks.length}/{analysis.checks.length}</span>
+              </div>
+              <div className="np-analyze-track" aria-hidden><motion.span animate={{ width: `${(visibleChecks.length / analysis.checks.length) * 100}%` }} transition={{ type: "spring", bounce: 0, duration: 0.4 }} /></div>
+              <ul className="np-checks">
+                <AnimatePresence initial={false}>
+                  {visibleChecks.map((check) => (
+                    <motion.li key={check.label} data-ok={check.ok} initial={reduced ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", bounce: 0, duration: 0.3 }}>
+                      <span className="np-check-icon" aria-hidden>{check.ok ? <Check /> : <X />}</span>
+                      <code>{check.label}</code>
+                    </motion.li>
+                  ))}
+                </AnimatePresence>
+              </ul>
+              {done ? (
+                <motion.dl className="np-detected" initial={reduced ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", bounce: 0, duration: 0.36 }}>
+                  <div><dt>Framework</dt><dd>{FRAMEWORKS[analysis.framework].label}</dd></div>
+                  <div><dt>Package manager</dt><dd>{analysis.packageManager ?? "None"}</dd></div>
+                  <div><dt>Port</dt><dd><code>{analysis.internalPort}</code></dd></div>
+                  <div><dt>Build</dt><dd><code>{analysis.buildCommand || "Not set"}</code></dd></div>
+                  <div className="np-detected-wide"><dt>Start</dt><dd><code>{analysis.startCommand || "Not set"}</code></dd></div>
+                </motion.dl>
+              ) : null}
+            </div>
+            <div className="mt-5 flex gap-2">
+              <Button variant="ghost" onClick={() => setStage(source?.type === "github" ? "github" : source?.type === "upload" ? "upload" : source?.type === "git" ? "git" : source?.type === "image" ? "image" : source?.type === "compose" ? "compose" : "choose")}><ArrowRight aria-hidden className="rotate-180" />Back</Button>
+              <Button variant="primary" disabled={!done} onClick={() => setStage("configure")}>Configure deploy<ArrowRight aria-hidden /></Button>
+            </div>
+          </section>
+        )
+      })() : null}
 
       {stage === "configure" ? (
         <form
@@ -773,15 +828,6 @@ function RecentlyDeployed() {
         ))}
       </ul>
     </section>
-  )
-}
-
-function Row({ term, value }: { term: string; value: string }) {
-  return (
-    <div className="grid grid-cols-[160px_1fr] gap-3">
-      <dt className="text-muted">{term}</dt>
-      <dd className="font-mono text-[13px]">{value}</dd>
-    </div>
   )
 }
 

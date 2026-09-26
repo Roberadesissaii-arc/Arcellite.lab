@@ -14,6 +14,7 @@ import { envError } from "@/components/projects/env-editor"
 import { useDeploy, useDeployState } from "@/lib/deploy/react"
 import type { EnvironmentVariable } from "@/lib/deploy/types"
 import { looksSecret, parseDotenv } from "@/lib/deploy/dotenv"
+import { KeyGlyph } from "@/components/environment/key-glyph"
 
 type Scope = EnvironmentVariable["scope"]
 const SCOPES: { value: Scope | "any"; label: string }[] = [
@@ -153,19 +154,18 @@ export function EnvironmentView() {
                 <Link href={`/projects/${project.id}/environment`} className="env-pane-link">Project settings<ArrowUpRight size={13} aria-hidden /></Link>
               </header>
               {project.env.length ? (
-                <div className="env-scope-mix">
-                  <span className="env-scope-bar" role="img" aria-label="Variables by scope">
-                    {(Object.keys(SCOPE_LABEL) as Scope[]).map((key) => {
-                      const count = project.env.filter((item) => item.scope === key).length
-                      return count ? <i key={key} data-scope={key} style={{ flexGrow: count }} /> : null
-                    })}
-                  </span>
-                  <ul>
-                    {(Object.keys(SCOPE_LABEL) as Scope[]).map((key) => (
-                      <li key={key} data-scope={key}><i aria-hidden />{key === "all" ? "Shared" : SCOPE_LABEL[key]}<strong>{project.env.filter((item) => item.scope === key).length}</strong></li>
-                    ))}
-                  </ul>
-                </div>
+                <ul className="env-scope-mix" aria-label="Variables by scope">
+                  {(Object.keys(SCOPE_LABEL) as Scope[]).map((key) => {
+                    const count = project.env.filter((item) => item.scope === key).length
+                    return (
+                      <li key={key} data-scope={key} data-empty={count === 0}>
+                        <span className="env-scope-label"><i aria-hidden />{key === "all" ? "Shared" : SCOPE_LABEL[key]}</span>
+                        <strong>{count}</strong>
+                        <span className="env-scope-track" aria-hidden><span style={{ width: `${(count / project.env.length) * 100}%` }} /></span>
+                      </li>
+                    )
+                  })}
+                </ul>
               ) : null}
               {rows.length === 0 ? (
                 <div className="env-pane-empty">
@@ -181,8 +181,11 @@ export function EnvironmentView() {
                     return (
                       <div key={item.id} className="env-row" role="row">
                         <span role="cell" className="env-key">
-                          <span className="env-lock" data-secret={item.secret} title={item.secret ? "Secret" : "Plain value"}>{item.secret ? <Lock aria-hidden /> : <LockOpen aria-hidden />}</span>
-                          <code>{item.key}</code>
+                          <KeyGlyph name={item.key} secret={item.secret} />
+                          <span className="min-w-0">
+                            <code>{item.key}</code>
+                            <small data-secret={item.secret}>{item.secret ? "Secret · masked" : `Plain text · ${item.value.length} chars`}</small>
+                          </span>
                         </span>
                         <span role="cell" className="env-value"><code data-masked={!show}>{show ? item.value || "—" : mask(item.value)}</code></span>
                         <span role="cell"><Tag tone={SCOPE_TONE[item.scope]}>{SCOPE_LABEL[item.scope]}</Tag></span>
@@ -314,3 +317,4 @@ export function EnvironmentView() {
     </div>
   )
 }
+
