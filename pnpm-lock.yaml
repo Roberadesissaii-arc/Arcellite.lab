@@ -32,6 +32,9 @@ importers:
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
+      lucide-animated:
+        specifier: 1.0.5
+        version: 1.0.5(motion@13.4.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
       lucide-react:
         specifier: ^1.48.0
         version: 1.48.0(react@19.2.8)
@@ -2217,6 +2220,12 @@ packages:
 
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
+
+  lucide-animated@1.0.5:
+    resolution: {integrity: sha512-bNRQvgrZZ/rZTug5YET+qNvJLtVHGamEYQ0vCI/GWveBZTTKQAAIQc0M8U2MUJBYR1+kXtjzFhpZL7oOqnD2CA==}
+    peerDependencies:
+      motion: '>=11.0.0'
+      react: '>=18.0.0'
 
   lucide-react@1.48.0:
     resolution: {integrity: sha512-R0CIKY/fXiC6y9xRBADgsK+VW2p/pcTJOMhLZf1T+uG+vJUvyUR02nGOgmIIC7MPkiNK4Ox8QDnbqF8rJYWPZQ==}
@@ -4989,6 +4998,11 @@ snapshots:
   lru-cache@5.1.1:
     dependencies:
       yallist: 3.1.1
+
+  lucide-animated@1.0.5(motion@13.4.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8):
+    dependencies:
+      motion: 13.4.3(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react: 19.2.8
 
   lucide-react@1.48.0(react@19.2.8):
     dependencies:

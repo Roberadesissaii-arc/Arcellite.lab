@@ -112,6 +112,7 @@ function crumbLabel(pathname: string): string {
     "/projects": "Projects",
     "/projects/new": "New project",
     "/deployments": "Deployments",
+    "/environment": "Environment",
     "/servers": "Servers",
     "/containers": "Containers",
     "/domains": "Domains",

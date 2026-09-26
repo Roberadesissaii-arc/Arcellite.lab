@@ -15,42 +15,16 @@ import {
   tableFeatures,
   useTable,
 } from "@tanstack/react-table"
-import { ChevronDownIcon, ChevronUpIcon, Code2, MoreHorizontal, Zap } from "lucide-react"
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Code2, MoreHorizontal, Zap } from "lucide-react"
 import Link from "next/link"
 import { useMemo } from "react"
 import { IconButton } from "@/components/ui/button"
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/overlays"
 import { DeploymentStatusView } from "@/components/ui/status"
-import { Badge } from "@/components/ui/p-table-4-utils/badge"
-import { Button } from "@/components/ui/p-table-4-utils/button"
-import { Checkbox } from "@/components/ui/p-table-4-utils/checkbox"
-import { Frame, FrameFooter } from "@/components/ui/p-table-4-utils/frame"
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/p-table-4-utils/pagination"
-import {
-  Select,
-  SelectItem,
-  SelectPopup,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/p-table-4-utils/select"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/p-table-4-utils/table"
+import { IconTile, Tag } from "@/components/ui/kit"
 import { FRAMEWORKS } from "@/lib/deploy/detect"
 import { formatRelative } from "@/lib/deploy/format"
 import { projectEndpoint, sourceText } from "@/lib/deploy/helpers"
-import { cn } from "@/lib/utils"
 import type { DeploymentStatus, EnvironmentName, Framework, Project } from "@/lib/deploy/types"
 
 export type ProjectTableRow = {
@@ -93,25 +67,16 @@ const features = tableFeatures({
   },
 })
 
-const statusDot: Record<DeploymentStatus, string> = {
-  ready: "bg-emerald-500",
-  building: "bg-blue-500",
-  deploying: "bg-blue-500",
-  preparing: "bg-blue-500",
-  queued: "bg-zinc-400",
-  failed: "bg-red-500",
-  canceled: "bg-zinc-400",
-  stopped: "bg-amber-500",
-}
-
 function buildColumns(actions: Omit<ProjectsTableProps, "rows" | "now">): ColumnDef<typeof features, ProjectTableRow>[] {
   return [
     {
       cell: ({ row }) => (
-        <Checkbox
-          aria-label="Select row"
+        <input
+          type="checkbox"
+          className="table-check"
+          aria-label={`Select ${row.original.name}`}
           checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
+          onChange={(event) => row.toggleSelected(event.target.checked)}
         />
       ),
       enableSorting: false,
@@ -119,41 +84,41 @@ function buildColumns(actions: Omit<ProjectsTableProps, "rows" | "now">): Column
         const isAllSelected = table.getIsAllPageRowsSelected()
         const isSomeSelected = table.getIsSomePageRowsSelected()
         return (
-          <Checkbox
+          <input
+            type="checkbox"
+            className="table-check"
             aria-label="Select all rows"
             checked={isAllSelected}
-            indeterminate={isSomeSelected && !isAllSelected}
-            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            ref={(node) => { if (node) node.indeterminate = isSomeSelected && !isAllSelected }}
+            onChange={(event) => table.toggleAllPageRowsSelected(event.target.checked)}
           />
         )
       },
       id: "select",
-      size: 28,
+      size: 44,
     },
     {
       accessorKey: "name",
       cell: ({ row }) => (
         <Link
           href={`/projects/${row.original.id}`}
-          className="relative z-10 flex min-w-0 items-center gap-2 font-medium"
+          className="table-identity"
           onClick={(e) => e.stopPropagation()}
         >
-          <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-sunken text-muted-foreground">
-            {row.original.framework === "fastapi" ? <Zap className="size-3.5" aria-hidden /> : <Code2 className="size-3.5" aria-hidden />}
-          </span>
+          <IconTile icon={row.original.framework === "fastapi" ? Zap : Code2} tone={row.original.status === "failed" ? "danger" : row.original.status === "ready" ? "brand" : "info"} />
           <span className="min-w-0">
-            <span className="block truncate">{row.original.name}</span>
-            <span className="block truncate text-xs font-normal text-muted-foreground">{row.original.sourceLabel}</span>
+            <strong>{row.original.name}</strong>
+            <small>{row.original.sourceLabel}</small>
           </span>
         </Link>
       ),
       header: "Project",
-      size: 220,
+      size: 260,
     },
     {
       accessorKey: "environment",
       cell: ({ row }) => (
-        <span className="capitalize text-muted-foreground">{row.original.environment}</span>
+        <Tag tone={row.original.environment === "production" ? "brand" : row.original.environment === "preview" ? "info" : "neutral"}><span className="capitalize">{row.original.environment}</span></Tag>
       ),
       header: "Environment",
       size: 110,
@@ -161,9 +126,7 @@ function buildColumns(actions: Omit<ProjectsTableProps, "rows" | "now">): Column
     {
       accessorKey: "frameworkLabel",
       cell: ({ row }) => (
-        <Badge variant="outline" className="font-normal">
-          {row.original.frameworkLabel}
-        </Badge>
+        <span className="text-[12px] text-muted">{row.original.frameworkLabel}</span>
       ),
       header: "Framework",
       size: 120,
@@ -171,13 +134,9 @@ function buildColumns(actions: Omit<ProjectsTableProps, "rows" | "now">): Column
     {
       accessorKey: "status",
       cell: ({ row }) => (
-        <Badge variant="outline">
-          <span
-            aria-hidden
-            className={cn("size-1.5 rounded-full", statusDot[row.original.status] ?? "bg-zinc-400")}
-          />
+        <span className="table-status" data-status={row.original.status}>
           <DeploymentStatusView value={row.original.status} />
-        </Badge>
+        </span>
       ),
       header: "Status",
       size: 130,
@@ -185,7 +144,7 @@ function buildColumns(actions: Omit<ProjectsTableProps, "rows" | "now">): Column
     {
       accessorKey: "hostname",
       cell: ({ row }) => (
-        <span className="truncate font-mono text-xs text-muted-foreground">{row.original.hostname}</span>
+        <code className="table-code">{row.original.hostname}</code>
       ),
       header: "Endpoint",
       size: 160,
@@ -193,7 +152,7 @@ function buildColumns(actions: Omit<ProjectsTableProps, "rows" | "now">): Column
     {
       accessorKey: "updatedAt",
       cell: ({ row }) => (
-        <span className="tabular-nums text-muted-foreground">{row.original.updatedLabel}</span>
+        <span className="text-[12px] tabular-nums text-faint">{row.original.updatedLabel}</span>
       ),
       header: "Updated",
       size: 100,
@@ -267,7 +226,6 @@ export function ProjectsTable(props: ProjectsTableProps) {
         onDeleteRequest: props.onDeleteRequest,
         onCopyEndpoint: props.onCopyEndpoint,
       }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [props.onOpen, props.onRedeploy, props.onLogs, props.onSettings, props.onDeleteRequest, props.onCopyEndpoint],
   )
 
@@ -300,165 +258,74 @@ export function ProjectsTable(props: ProjectsTableProps) {
     }),
   )
 
+  const selected = Object.keys(table.state.rowSelection ?? {}).length
+  const { pageIndex, pageSize: size } = table.state.pagination
+  const total = table.getRowCount()
+  const first = total ? pageIndex * size + 1 : 0
+  const last = Math.min((pageIndex + 1) * size, total)
+
   return (
-    <Frame className="w-full">
-      <Table variant="card" className="table-fixed">
-        <TableHeader>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow className="hover:bg-transparent" key={headerGroup.id}>
-              {headerGroup.headers.map((header) => {
-                const columnSize = header.column.getSize()
-                return (
-                  <TableHead
-                    key={header.id}
-                    style={columnSize ? { width: `${columnSize}px` } : undefined}
-                  >
-                    {header.isPlaceholder ? null : header.column.getCanSort() ? (
-                      <div
-                        className="flex h-full cursor-pointer select-none items-center justify-between gap-2"
-                        onClick={header.column.getToggleSortingHandler()}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault()
-                            header.column.getToggleSortingHandler()?.(e)
-                          }
-                        }}
-                        role="button"
-                        tabIndex={0}
-                      >
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                        {{
-                          asc: (
-                            <ChevronUpIcon aria-hidden className="size-4 shrink-0 opacity-80" />
-                          ),
-                          desc: (
-                            <ChevronDownIcon aria-hidden className="size-4 shrink-0 opacity-80" />
-                          ),
-                        }[header.column.getIsSorted() as string] ?? null}
-                      </div>
-                    ) : (
-                      flexRender(header.column.columnDef.header, header.getContext())
-                    )}
-                  </TableHead>
-                )
-              })}
-            </TableRow>
-          ))}
-        </TableHeader>
-        <TableBody>
-          {table.getRowModel().rows.length ? (
-            table.getRowModel().rows.map((row) => (
-              <TableRow
-                data-state={row.getIsSelected() ? "selected" : undefined}
-                key={row.id}
-                className="cursor-pointer"
-                onClick={() => onOpen(row.original.id)}
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell
-                    key={cell.id}
-                    onClick={
-                      cell.column.id === "select" || cell.column.id === "actions"
-                        ? (e) => e.stopPropagation()
-                        : undefined
-                    }
-                  >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))
-          ) : (
-            <TableRow>
-              <TableCell className="h-24 text-center" colSpan={columns.length}>
-                No results.
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-      <FrameFooter className="p-2">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 whitespace-nowrap">
-            <p className="text-muted-foreground text-sm">Viewing</p>
-            <Select
-              items={Array.from({ length: Math.max(table.getPageCount(), 1) }, (_, i) => {
-                const start = i * table.state.pagination.pageSize + 1
-                const end = Math.min(
-                  (i + 1) * table.state.pagination.pageSize,
-                  table.getRowCount(),
-                )
-                const pageNum = i + 1
-                return { label: `${start}-${end}`, value: pageNum }
-              })}
-              onValueChange={(value) => {
-                table.setPageIndex((value as number) - 1)
-              }}
-              value={table.state.pagination.pageIndex + 1}
-            >
-              <SelectTrigger
-                aria-label="Select result range"
-                className="w-fit min-w-none"
-                size="sm"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectPopup>
-                {Array.from({ length: Math.max(table.getPageCount(), 1) }, (_, i) => {
-                  const start = i * table.state.pagination.pageSize + 1
-                  const end = Math.min(
-                    (i + 1) * table.state.pagination.pageSize,
-                    table.getRowCount(),
-                  )
-                  const pageNum = i + 1
+    <div className="panel data-table-wrap">
+      <div className="data-table-scroll">
+        <table className="data-table">
+          <colgroup>
+            {table.getVisibleLeafColumns().map((column) => <col key={column.id} className={`col-${column.id}`} style={{ width: column.getSize() }} />)}
+          </colgroup>
+          <thead>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <tr key={headerGroup.id}>
+                {headerGroup.headers.map((header) => {
+                  const sorted = header.column.getIsSorted()
                   return (
-                    <SelectItem key={pageNum} value={pageNum}>
-                      {`${start}-${end}`}
-                    </SelectItem>
+                    <th key={header.id} className={`col-${header.column.id}`} aria-sort={sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : undefined}>
+                      {header.isPlaceholder ? null : header.column.getCanSort() ? (
+                        <button type="button" className="th-sort" data-sorted={Boolean(sorted)} onClick={header.column.getToggleSortingHandler()}>
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                          {sorted === "asc" ? <ArrowUp aria-hidden /> : sorted === "desc" ? <ArrowDown aria-hidden /> : <ArrowUpDown aria-hidden />}
+                        </button>
+                      ) : (
+                        flexRender(header.column.columnDef.header, header.getContext())
+                      )}
+                    </th>
                   )
                 })}
-              </SelectPopup>
-            </Select>
-            <p className="text-muted-foreground text-sm">
-              of{" "}
-              <strong className="font-medium text-foreground">{table.getRowCount()}</strong>{" "}
-              results
-            </p>
-          </div>
-
-          <Pagination className="justify-end">
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  className="sm:*:[svg]:hidden"
-                  render={
-                    <Button
-                      disabled={!table.getCanPreviousPage()}
-                      onClick={() => table.previousPage()}
-                      size="sm"
-                      variant="outline"
-                    />
-                  }
-                />
-              </PaginationItem>
-              <PaginationItem>
-                <PaginationNext
-                  className="sm:*:[svg]:hidden"
-                  render={
-                    <Button
-                      disabled={!table.getCanNextPage()}
-                      onClick={() => table.nextPage()}
-                      size="sm"
-                      variant="outline"
-                    />
-                  }
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
+              </tr>
+            ))}
+          </thead>
+          <tbody>
+            {table.getRowModel().rows.length ? (
+              table.getRowModel().rows.map((row) => (
+                <tr key={row.id} data-selected={row.getIsSelected() || undefined} onClick={() => onOpen(row.original.id)}>
+                  {row.getVisibleCells().map((cell) => (
+                    <td
+                      key={cell.id}
+                      className={`col-${cell.column.id}`}
+                      onClick={cell.column.id === "select" || cell.column.id === "actions" ? (e) => e.stopPropagation() : undefined}
+                    >
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td className="py-10 text-center text-muted" colSpan={columns.length}>No results.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <div className="data-table-footer">
+        <p>
+          {selected ? <><strong>{selected}</strong> selected · </> : null}
+          Showing <strong>{first}–{last}</strong> of <strong>{total}</strong>
+        </p>
+        <div className="flex items-center gap-1">
+          <span className="mr-2 text-faint">Page {pageIndex + 1} of {Math.max(table.getPageCount(), 1)}</span>
+          <button type="button" className="icon-btn pressable" aria-label="Previous page" disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}><ChevronLeft aria-hidden /></button>
+          <button type="button" className="icon-btn pressable" aria-label="Next page" disabled={!table.getCanNextPage()} onClick={() => table.nextPage()}><ChevronRight aria-hidden /></button>
         </div>
-      </FrameFooter>
-    </Frame>
+      </div>
+    </div>
   )
 }
-
