@@ -1,0 +1,8 @@
+import type { Metadata } from "next"
+import { StorageView } from "@/components/storage/storage-view"
+
+export const metadata: Metadata = { title: "Storage" }
+
+export default function Page() {
+  return <StorageView />
+}

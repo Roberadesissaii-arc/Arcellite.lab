@@ -1,0 +1,119 @@
+/* Arcellite brand tokens.
+   Primary #5D5FEF and hover #4D4FCF are taken from the live arcellite.com UI
+   (theme-color, navigation mark, and primary button). */
+
+:root {
+  --brand-primary: #5d5fef;
+  --brand-primary-hover: #4d4fcf;
+  --brand-primary-active: #3c3eab;
+  --brand-primary-subtle: color-mix(in srgb, var(--brand-primary) 10%, transparent);
+  --brand-primary-foreground: #ffffff;
+
+  --workspace-bg: #ffffff;
+  --workspace-text: #09090b;
+  --workspace-muted: #52525b;
+  --workspace-border: #e4e4e7;
+  --workspace-soft: #f4f4f5;
+  --sidebar-bg: #09090b;
+  --sidebar-text: rgba(255,255,255,.50);
+  --sidebar-text-active: rgba(255,255,255,.95);
+  --sidebar-section-text: rgba(255,255,255,.30);
+  --sidebar-hover: rgba(255,255,255,.04);
+  --sidebar-active: rgba(255,255,255,.08);
+  --sidebar-divider: rgba(255,255,255,.06);
+  --sidebar-count-bg: rgba(255,255,255,.07);
+  --sidebar-count-text: rgba(255,255,255,.45);
+
+  --surface-canvas: var(--workspace-bg);
+  --surface-sidebar: #09090b;
+  --surface-raised: #ffffff;
+  --surface-sunken: #f4f4f5;
+  --surface-overlay: rgba(255, 255, 255, 0.92);
+  --surface-overlay-solid: #ffffff;
+
+  --text-primary: #09090b;
+  --text-secondary: #52525b;
+  --text-tertiary: #71717a;
+
+  --border-subtle: #e4e4e7;
+  --border-strong: #d4d4d8;
+
+  --status-success: #067647;
+  --status-success-subtle: rgba(6, 118, 71, 0.12);
+  --status-warning: #8a5b00;
+  --status-warning-subtle: rgba(138, 91, 0, 0.12);
+  --status-danger: #c4272e;
+  --status-danger-subtle: rgba(196, 39, 46, 0.1);
+  --status-info: #2563eb;
+  --status-info-subtle: rgba(37, 99, 235, 0.10);
+
+  --press: rgba(29, 29, 31, 0.06);
+  --material-bg: rgba(247, 247, 249, 0.82);
+  --material-blur: 22px;
+  --shadow-overlay: 0 18px 50px rgba(29, 29, 31, 0.16);
+  --shadow-popover: 0 12px 32px rgba(29, 29, 31, 0.12);
+  --selection: rgba(93, 95, 239, 0.22);
+
+  --radius-control: 8px;
+  --radius-button: 10px;
+  --radius-panel: 16px;
+  --radius-sheet: 16px;
+
+  --sidebar-width: 16rem;
+  --sidebar-collapsed: 3rem;
+
+  color-scheme: light;
+}
+
+
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --material-blur: 0px;
+    --material-bg: var(--surface-overlay-solid);
+    --surface-overlay: var(--surface-overlay-solid);
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --border-subtle: var(--border-strong);
+    --text-tertiary: var(--text-secondary);
+    --material-blur: 0px;
+    --material-bg: var(--surface-overlay-solid);
+  }
+}
+
+/* Explicit light scope also belongs on body-portaled workspace UI.
+   Legacy theme preferences are retained as data, never as surface selectors. */
+.app-main, .workspace-surface {
+  color-scheme: light;
+  --surface-canvas: var(--workspace-bg);
+  --surface-raised: var(--workspace-bg);
+  --surface-sunken: var(--workspace-soft);
+  --surface-overlay: rgba(255,255,255,.96);
+  --surface-overlay-solid: var(--workspace-bg);
+  --text-primary: var(--workspace-text);
+  --text-secondary: var(--workspace-muted);
+  --text-tertiary: #71717a;
+  --border-subtle: var(--workspace-border);
+  --border-strong: #d4d4d8;
+  --press: rgba(9,9,11,.04);
+  --material-bg: rgba(255,255,255,.96);
+  color: var(--text-primary);
+}
+.sidebar, .sidebar-drawer, .menu-dark {
+  color-scheme: dark;
+  --text-primary: var(--sidebar-text-active);
+  --text-secondary: var(--sidebar-text);
+  --text-tertiary: var(--sidebar-section-text);
+  --border-subtle: var(--sidebar-divider);
+  --press: var(--sidebar-hover);
+}
+@media (prefers-reduced-transparency: reduce) {
+  .app-main, .workspace-surface { --material-bg: #fff; --surface-overlay: #fff; }
+}
+@media (prefers-contrast: more) {
+  .app-main, .workspace-surface { --border-subtle: #a1a1aa; --text-tertiary: #52525b; }
+  .sidebar, .sidebar-drawer { --sidebar-text: rgba(255,255,255,.75); --sidebar-section-text: rgba(255,255,255,.6); }
+}
