@@ -1,8 +1,10 @@
 "use client"
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
-import { CircleAlert, CircleCheck, Info, X } from "lucide-react"
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react"
+import { X } from "lucide-react"
+import { BadgeAlertIcon, BellIcon, CircleCheckIcon } from "lucide-animated"
+import type { AnimatedIcon, AnimatedIconHandle } from "@/components/ui/animated-icon"
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import { useToastPrefs } from "@/lib/toast-prefs"
 
 export interface ToastInput {
@@ -21,7 +23,18 @@ export function useToast() {
   return useContext(ToastContext)
 }
 
-const ICONS = { default: CircleCheck, success: CircleCheck, info: Info, danger: CircleAlert }
+const ICONS: Record<NonNullable<ToastInput["tone"]>, AnimatedIcon> = { default: CircleCheckIcon, success: CircleCheckIcon, info: BellIcon, danger: BadgeAlertIcon }
+
+/** Plays the icon's own animation once when the toast arrives. */
+function ToastGlyph({ icon: Icon, animate }: { icon: AnimatedIcon; animate: boolean }) {
+  const ref = useRef<AnimatedIconHandle>(null)
+  useEffect(() => {
+    if (!animate) return
+    const timer = window.setTimeout(() => ref.current?.startAnimation(), 120)
+    return () => window.clearTimeout(timer)
+  }, [animate])
+  return <span className="toast-icon"><Icon ref={ref} size={20} /></span>
+}
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([])
@@ -58,7 +71,6 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       <div className="toast-region" data-position={prefs.position} aria-live="polite">
         <AnimatePresence initial={false}>
           {ordered.map((item) => {
-            const Icon = ICONS[item.tone ?? "default"]
             return (
               <motion.div
                 key={item.id}
@@ -72,7 +84,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 exit={from}
                 transition={reduced ? { duration: 0.12 } : { type: "spring", bounce: 0, duration: 0.34 }}
               >
-                <span className="toast-icon"><Icon aria-hidden /></span>
+                <ToastGlyph icon={ICONS[item.tone ?? "default"]} animate={!reduced} />
                 <div className="min-w-0 flex-1">
                   <p className="toast-title">{item.title}</p>
                   {item.description ? <p className="toast-description">{item.description}</p> : null}

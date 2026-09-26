@@ -7,6 +7,10 @@ export function ArcelliteMark({ className }: { className?: string }) {
     <svg viewBox="0 0 24 24" className={cn("text-brand", className)} aria-hidden>
       <path
         fill="currentColor"
+        fillOpacity={0.16}
+        stroke="currentColor"
+        strokeWidth={1.9}
+        strokeLinejoin="round"
         d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"
       />
     </svg>

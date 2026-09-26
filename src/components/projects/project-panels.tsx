@@ -9,6 +9,7 @@ import {
   KeyRound, Lock, MemoryStick, Network, Plus, RefreshCw, Rocket, RotateCcw, Save, ShieldCheck, Terminal, Trash2, User, Wrench,
 } from "lucide-react"
 import { KeyGlyph } from "@/components/environment/key-glyph"
+import { ProjectStatusCard } from "@/components/status/service-status"
 import { EnvEditor, envError } from "@/components/projects/env-editor"
 import { Button } from "@/components/ui/button"
 import { copyText, EmptyState } from "@/components/ui/bits"
@@ -84,6 +85,8 @@ export function ProjectOverview() {
         <StatCard icon={MemoryStick} tone="neutral" label="Memory" value={<>{web ? web.memoryMb : 0}<small> MB</small></>} detail={server ? `of ${server.memoryTotalGb} GB on ${server.name}` : "—"} />
         <StatCard icon={Clock} tone="success" label="Uptime" value={formatUptime(web?.startedAt ?? null, now)} detail={avgMs ? `Average build ${formatDuration(avgMs)}` : "No finished builds"} />
       </StatGrid>
+
+      <Reveal><ProjectStatusCard state={state} project={project} now={now} /></Reveal>
 
       <div className="project-grid">
         <Reveal index={0} className="panel project-card">
