@@ -4,7 +4,8 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useForm, useWatch } from "react-hook-form"
 import { z } from "zod"
-import { ArrowRight, Check, Container, GitBranch, Layers, Rocket, Upload } from "lucide-react"
+import Link from "next/link"
+import { ArrowRight, Check, Container, GitBranch, Layers, Rocket, Server, Upload } from "lucide-react"
 import { IconTile, SectionHeading, Tag } from "@/components/ui/kit"
 import { GitHubMark } from "@/components/brand"
 import { PageHeader } from "@/components/page-header"
@@ -22,8 +23,9 @@ import {
   FRAMEWORKS,
   FRAMEWORK_ORDER,
 } from "@/lib/deploy/detect"
-import { formatBytes } from "@/lib/deploy/format"
-import { nextFreePort, portTaken } from "@/lib/deploy/helpers"
+import { formatBytes, formatGb } from "@/lib/deploy/format"
+import { ServerStatusView } from "@/components/ui/status"
+import { homeServer, nextFreePort, portTaken } from "@/lib/deploy/helpers"
 import { useDeploy, useDeployState } from "@/lib/deploy/react"
 import { useReducedMotion } from "motion/react"
 import { DeployError, type AnalysisResult, type EnvironmentVariable, type Framework, type GitRepository, type ProjectSource } from "@/lib/deploy/types"
@@ -261,6 +263,8 @@ export function NewProjectView() {
           )
         })}
       </ol>
+      <div className="np-layout">
+      <div className="np-main">
       {stage === "choose" ? (
         <>
           <PageHeader icon={Rocket} kicker="New project" title="Deploy something new" description="Bring an application online from source code, a local project, or an existing container." />
@@ -661,7 +665,69 @@ export function NewProjectView() {
           </div>
         </form>
       ) : null}
+      </div>
+      <NewProjectAside stepIndex={STEPS.findIndex((item) => item.stages.includes(stage))} suggestedPort={suggestedPort} />
+      </div>
     </div>
+  )
+}
+
+const NEXT_STEPS = [
+  { title: "Choose a source", body: "GitHub, an upload, a Git URL, or a container image." },
+  { title: "Analyze", body: "Arcellite reads the files and detects the framework." },
+  { title: "Configure", body: "Review build commands, ports, and variables." },
+  { title: "Deploy", body: "The build runs on your server and gets a live URL." },
+]
+
+function NewProjectAside({ stepIndex, suggestedPort }: { stepIndex: number; suggestedPort: number }) {
+  const state = useDeployState()
+  if (!state) return null
+  const server = homeServer(state)
+  const recent = [...state.projects].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)).slice(0, 3)
+  return (
+    <aside className="np-aside" aria-label="Deployment details">
+      {server ? (
+        <section className="np-aside-card">
+          <p className="np-aside-label">Deploy target</p>
+          <div className="np-target">
+            <IconTile icon={Server} tone="brand" />
+            <span className="min-w-0 flex-1"><strong>{server.name}</strong><small>{server.os} · {server.ip}</small></span>
+            <ServerStatusView value={server.status} />
+          </div>
+          <dl className="np-target-stats">
+            <div><dt>CPU</dt><dd>{server.cpuPercent}%</dd><span className="meter"><span style={{ width: `${server.cpuPercent}%` }} /></span></div>
+            <div><dt>Memory</dt><dd>{formatGb(server.memoryUsedGb)} / {formatGb(server.memoryTotalGb)}</dd><span className="meter"><span style={{ width: `${server.memoryUsedGb / server.memoryTotalGb * 100}%` }} /></span></div>
+          </dl>
+          <p className="np-port"><span>Next free port</span><code>:{suggestedPort}</code></p>
+        </section>
+      ) : null}
+      <section className="np-aside-card">
+        <p className="np-aside-label">What happens next</p>
+        <ol className="np-timeline">
+          {NEXT_STEPS.map((step, index) => (
+            <li key={step.title} data-state={index < stepIndex ? "done" : index === stepIndex ? "current" : "todo"}>
+              <span className="np-timeline-dot">{index < stepIndex ? <Check aria-hidden /> : index + 1}</span>
+              <span><strong>{step.title}</strong><small>{step.body}</small></span>
+            </li>
+          ))}
+        </ol>
+      </section>
+      {recent.length ? (
+        <section className="np-aside-card">
+          <p className="np-aside-label">Recently deployed</p>
+          <ul className="np-recent">
+            {recent.map((project) => (
+              <li key={project.id}>
+                <Link href={`/projects/${project.id}`}>
+                  <span className="min-w-0 flex-1"><strong>{project.name}</strong><small>{FRAMEWORKS[project.framework].label} · <span className="capitalize">{project.environment}</span></small></span>
+                  <ArrowRight aria-hidden />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+    </aside>
   )
 }
 
