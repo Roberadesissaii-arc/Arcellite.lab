@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/toast"
 import { PageHeader } from "@/components/page-header"
 import { copyText, PageSkeleton } from "@/components/ui/bits"
 import { SelectInput } from "@/components/ui/fields"
+import { ServiceStatusBoard } from "@/components/status/service-status"
 import { EmptyPanel, IconTile, SearchField, SectionHeading, StatCard, StatGrid, Tag, deploymentTone } from "@/components/ui/kit"
 import { DeploymentStatusView } from "@/components/ui/status"
 import { filterDeployments } from "@/lib/deploy/filters"
@@ -104,6 +105,7 @@ export function DeploymentsView() {
         <StatCard icon={Loader} tone="info" label="In progress" value={running} detail={running ? "Building right now" : "Nothing building"} />
         <StatCard icon={CircleAlert} tone={failed ? "danger" : "neutral"} label="Failed" value={failed} detail={failed ? "Needs a look" : "No failed releases"} />
       </StatGrid>
+      <ServiceStatusBoard state={state} now={now} />
       <section>
         <SectionHeading title="Releases" count={rows.length} />
         <div className="filter-toolbar">

@@ -105,10 +105,12 @@ function ChatSession() {
   }
   return <div className="page project-chat-page">
     <header className="chat-topbar">
-      <span className="chat-avatar" aria-hidden><Sparkle /></span>
-      <div className="min-w-0">
-        <h1>Ask {ASSISTANT}</h1>
-        <p><span className="chat-live-dot" />Workspace assistant · Local, Phase 1</p>
+      <div className="chat-title-pill">
+        <span className="chat-avatar" aria-hidden><Sparkle /></span>
+        <div className="min-w-0">
+          <h1>Ask {ASSISTANT}</h1>
+          <p><span className="chat-live-dot" />Workspace assistant · Local, Phase 1</p>
+        </div>
       </div>
       <div className="chat-header-actions">
         <button type="button" className="chat-action" onClick={()=>setHistoryOpen(true)}><History aria-hidden /><span>History</span>{history.length ? <span className="chat-history-count">{history.length}</span> : null}</button>

@@ -43,7 +43,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       </a>
       <Sidebar />
       <div className={pathname === "/chat" ? "app-main app-main-chat" : "app-main"}>
-        <header className="workspace-header">
+        <header className={pathname === "/chat" ? "workspace-header workspace-header-chat" : "workspace-header"}>
           <button type="button" className="icon-btn pressable md:hidden" aria-label="Open navigation" onClick={() => setDrawer(true)}>
             <Menu aria-hidden />
           </button>

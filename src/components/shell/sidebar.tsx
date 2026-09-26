@@ -95,10 +95,10 @@ export function SidebarNav({
         <Link href="/" onClick={onNavigate} className={cn("flex min-w-0 items-center gap-2", collapsed && "justify-center")} aria-label="Arcellite Deploy">
           <ArcelliteMark className="h-5 w-5 shrink-0 text-brand" />
           {!collapsed && (
-            <span className="flex items-baseline">
+            <span className="flex items-center">
               <span className="text-[17px] font-bold leading-none tracking-tight text-white">Arcellite</span>
               <span className="text-[17px] font-bold leading-none" style={{ color: "var(--brand-primary)" }}>.</span>
-              <span className="ml-4 text-[13px] font-medium leading-none text-white/55">Deploy</span>
+              <span className="sidebar-deploy-badge">Deploy</span>
             </span>
           )}
         </Link>
