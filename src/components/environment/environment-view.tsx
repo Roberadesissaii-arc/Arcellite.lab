@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { copyText, PageSkeleton } from "@/components/ui/bits"
 import { Field, SelectInput, TextInput } from "@/components/ui/fields"
-import { EmptyPanel, IconTile, SearchField, SectionHeading, StatCard, StatGrid, Tag } from "@/components/ui/kit"
+import { EmptyPanel, IconTile, SearchField, StatCard, StatGrid, Tag } from "@/components/ui/kit"
 import { ConfirmDialog, Modal } from "@/components/ui/overlays"
 import { useToast } from "@/components/ui/toast"
 import { envError } from "@/components/projects/env-editor"
@@ -86,9 +86,9 @@ export function EnvironmentView() {
       {state.projects.length === 0 ? (
         <EmptyPanel icon={KeyRound} title="No projects yet" body="Create a project to give it environment variables." action={<Link href="/projects/new" className="btn btn-primary">New project</Link>} />
       ) : (
-        <div className="env-layout">
-          <section>
-            <SectionHeading title="Projects" count={state.projects.length} />
+        <div className="env-workbench">
+          <aside className="env-rail">
+            <p className="env-rail-label">Projects<span className="section-count">{state.projects.length}</span></p>
             <ul className="env-projects">
               {state.projects.map((item) => (
                 <li key={item.id}>
@@ -104,48 +104,70 @@ export function EnvironmentView() {
               <ShieldCheck aria-hidden />
               <p><strong>How secrets are handled.</strong> Values are written to the container at start and never into the image or build log. In Phase 1 they are stored in this browser only.</p>
             </div>
-          </section>
+          </aside>
 
           {project ? (
-            <section className="min-w-0">
-              <SectionHeading title={project.name} count={rows.length} aside={<Link href={`/projects/${project.id}/environment`} className="inline-flex items-center gap-1 text-xs text-muted hover:text-[var(--brand-primary)]">Project settings<ArrowUpRight size={13} aria-hidden /></Link>} />
-              <div className="page-toolbar">
+            <section className="env-pane">
+              <header className="env-pane-head">
+                <IconTile icon={FolderKanban} tone="brand" />
+                <div className="min-w-0 flex-1">
+                  <h2>{project.name}</h2>
+                  <p><span className="capitalize">{project.environment}</span> · {project.env.length} variable{project.env.length === 1 ? "" : "s"} · {project.env.filter((item) => item.secret).length} secret</p>
+                </div>
+                <Link href={`/projects/${project.id}/environment`} className="env-pane-link">Project settings<ArrowUpRight size={13} aria-hidden /></Link>
+              </header>
+              {project.env.length ? (
+                <div className="env-scope-mix">
+                  <span className="env-scope-bar" role="img" aria-label="Variables by scope">
+                    {(Object.keys(SCOPE_LABEL) as Scope[]).map((key) => {
+                      const count = project.env.filter((item) => item.scope === key).length
+                      return count ? <i key={key} data-scope={key} style={{ flexGrow: count }} /> : null
+                    })}
+                  </span>
+                  <ul>
+                    {(Object.keys(SCOPE_LABEL) as Scope[]).map((key) => (
+                      <li key={key} data-scope={key}><i aria-hidden />{key === "all" ? "Shared" : SCOPE_LABEL[key]}<strong>{project.env.filter((item) => item.scope === key).length}</strong></li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              <div className="page-toolbar env-pane-toolbar">
                 <SearchField value={search} onChange={setSearch} placeholder="Search keys" label="Search variables" />
                 <div className="segmented" role="group" aria-label="Filter by scope">
                   {SCOPES.map((item) => <button key={item.value} type="button" aria-pressed={scope === item.value} onClick={() => setScope(item.value)}>{item.label}</button>)}
                 </div>
               </div>
-              <div className="mt-3">
-                {rows.length === 0 ? (
+              {rows.length === 0 ? (
+                <div className="env-pane-empty">
                   <EmptyPanel icon={KeyRound} title={project.env.length ? "No variables match" : "No variables yet"} body={project.env.length ? "Try another scope or search." : "Add a variable to make it available to this project on its next deploy."} />
-                ) : (
-                  <div className="panel env-table" role="table" aria-label={`${project.name} variables`}>
-                    <div className="env-row env-head" role="row">
-                      <span role="columnheader">Key</span><span role="columnheader">Value</span><span role="columnheader">Scope</span><span role="columnheader" className="sr-only">Actions</span>
-                    </div>
-                    {rows.map((item) => {
-                      const show = !item.secret || revealed[item.id]
-                      return (
-                        <div key={item.id} className="env-row" role="row">
-                          <span role="cell" className="env-key">
-                            <span className="env-lock" data-secret={item.secret} title={item.secret ? "Secret" : "Plain value"}>{item.secret ? <Lock aria-hidden /> : <LockOpen aria-hidden />}</span>
-                            <code>{item.key}</code>
-                          </span>
-                          <span role="cell" className="env-value"><code data-masked={!show}>{show ? item.value || "—" : mask(item.value)}</code></span>
-                          <span role="cell"><Tag tone={SCOPE_TONE[item.scope]}>{SCOPE_LABEL[item.scope]}</Tag></span>
-                          <span role="cell" className="env-actions">
-                            {item.secret ? (
-                              <button type="button" className="icon-btn" aria-label={show ? `Hide ${item.key}` : `Reveal ${item.key}`} onClick={() => setRevealed((current) => ({ ...current, [item.id]: !current[item.id] }))}>{show ? <EyeOff aria-hidden /> : <Eye aria-hidden />}</button>
-                            ) : null}
-                            <button type="button" className="icon-btn" aria-label={`Copy ${item.key}`} onClick={() => void copyText(item.value).then((ok) => toast(ok ? { title: `${item.key} copied` } : { title: "Could not copy", tone: "danger" }))}><Copy aria-hidden /></button>
-                            <button type="button" className="icon-btn" aria-label={`Remove ${item.key}`} onClick={() => setRemoving(item)}><Trash2 aria-hidden /></button>
-                          </span>
-                        </div>
-                      )
-                    })}
+                </div>
+              ) : (
+                <div className="env-table" role="table" aria-label={`${project.name} variables`}>
+                  <div className="env-row env-head" role="row">
+                    <span role="columnheader">Key</span><span role="columnheader">Value</span><span role="columnheader">Scope</span><span role="columnheader" className="sr-only">Actions</span>
                   </div>
-                )}
-              </div>
+                  {rows.map((item) => {
+                    const show = !item.secret || revealed[item.id]
+                    return (
+                      <div key={item.id} className="env-row" role="row">
+                        <span role="cell" className="env-key">
+                          <span className="env-lock" data-secret={item.secret} title={item.secret ? "Secret" : "Plain value"}>{item.secret ? <Lock aria-hidden /> : <LockOpen aria-hidden />}</span>
+                          <code>{item.key}</code>
+                        </span>
+                        <span role="cell" className="env-value"><code data-masked={!show}>{show ? item.value || "—" : mask(item.value)}</code></span>
+                        <span role="cell"><Tag tone={SCOPE_TONE[item.scope]}>{SCOPE_LABEL[item.scope]}</Tag></span>
+                        <span role="cell" className="env-actions">
+                          {item.secret ? (
+                            <button type="button" className="icon-btn" aria-label={show ? `Hide ${item.key}` : `Reveal ${item.key}`} onClick={() => setRevealed((current) => ({ ...current, [item.id]: !current[item.id] }))}>{show ? <EyeOff aria-hidden /> : <Eye aria-hidden />}</button>
+                          ) : null}
+                          <button type="button" className="icon-btn" aria-label={`Copy ${item.key}`} onClick={() => void copyText(item.value).then((ok) => toast(ok ? { title: `${item.key} copied` } : { title: "Could not copy", tone: "danger" }))}><Copy aria-hidden /></button>
+                          <button type="button" className="icon-btn" aria-label={`Remove ${item.key}`} onClick={() => setRemoving(item)}><Trash2 aria-hidden /></button>
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </section>
           ) : null}
         </div>

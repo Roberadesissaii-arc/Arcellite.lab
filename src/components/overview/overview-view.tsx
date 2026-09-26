@@ -1,14 +1,17 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowRight, Boxes, Check, CircleAlert, Code2, FolderKanban, Server, Zap, GitBranch, Globe2, Sparkle, ArrowUpRight, Plus } from "lucide-react"
+import { ArrowRight, Boxes, Check, CircleAlert, Code2, Server, Zap, GitBranch, Globe2, ArrowUpRight, Plus } from "lucide-react"
+import { BoxesIcon, EarthIcon, FolderKanbanIcon, GitBranchIcon, SparklesIcon } from "lucide-animated"
 import { DeploymentStatusView, ServerStatusView } from "@/components/ui/status"
 import { PageSkeleton } from "@/components/ui/bits"
+import { useIconAnimation, type AnimatedIcon } from "@/components/ui/animated-icon"
 import { FRAMEWORKS } from "@/lib/deploy/detect"
 import { formatGb, formatRelative, greeting } from "@/lib/deploy/format"
 import { homeServer, latestDeployment, projectBadge, sourceText } from "@/lib/deploy/helpers"
 import { useDeployState } from "@/lib/deploy/react"
 import { useNow } from "@/lib/use-now"
+import type { ActivityEvent } from "@/lib/deploy/types"
 
 function SectionHeading({ title, href, action = "View all" }: { title: string; href: string; action?: string }) {
   return <div className="section-heading"><h2>{title}</h2><Link href={href}>{action}<ArrowRight aria-hidden /></Link></div>
@@ -20,7 +23,7 @@ export function OverviewView() {
   if (!state) return <PageSkeleton variant="overview" />
   const server = homeServer(state)
   const projects = [...state.projects].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
-  const activity = state.activity.slice(0, 5)
+  const activity = state.activity.slice(0, 3)
   const inFlight = state.deployments.filter((item) => !["ready", "failed", "canceled", "stopped"].includes(item.status))
   const failed = projects.filter((project) => projectBadge(project, latestDeployment(state.deployments, project.id, now)) === "failed")
   const waiting = state.domains.filter((domain) => domain.status === "dns-required" || domain.status === "invalid")
@@ -48,10 +51,10 @@ export function OverviewView() {
       </section>
 
       <div className="overview-stats">
-        <Stat href="/projects" icon={<FolderKanban />} label="Projects" value={state.projects.length} detail={`${running} ready to serve`} />
-        <Stat href="/deployments" icon={<GitBranch />} label="Deployments" value={state.deployments.length} detail={inFlight.length ? `${inFlight.length} in progress` : 'No builds in progress'} />
-        <Stat href="/containers" icon={<Boxes />} label="Containers" value={state.containers.filter(c => c.state === 'running').length} detail={`Running across ${state.servers.length} server${state.servers.length === 1 ? '' : 's'}`} />
-        <Stat href="/domains" icon={<Globe2 />} label="Domains" value={state.domains.length} detail={waiting.length ? `${waiting.length} need verification` : 'All domains verified'} />
+        <Stat href="/projects" icon={FolderKanbanIcon} label="Projects" value={state.projects.length} detail={`${running} ready to serve`} />
+        <Stat href="/deployments" icon={GitBranchIcon} label="Deployments" value={state.deployments.length} detail={inFlight.length ? `${inFlight.length} in progress` : 'No builds in progress'} />
+        <Stat href="/containers" icon={BoxesIcon} label="Containers" value={state.containers.filter(c => c.state === 'running').length} detail={`Running across ${state.servers.length} server${state.servers.length === 1 ? '' : 's'}`} />
+        <Stat href="/domains" icon={EarthIcon} label="Domains" value={state.domains.length} detail={waiting.length ? `${waiting.length} need verification` : 'All domains verified'} />
       </div>
 
       {server?.status === "offline" || failed.length || waiting.length ? <div className="notice-list" aria-label="Needs attention">
@@ -77,8 +80,7 @@ export function OverviewView() {
         </div>
       </section>
 
-      <Link href="/chat" className="overview-chat"><span className="chat-spark"><Sparkle /></span><span><strong>Ask Arc — a second pair of eyes on your projects.</strong><small>Ask what’s running, check a deployment, or find what needs attention.</small></span><span className="chat-open">Ask Arc<ArrowUpRight size={15} /></span></Link>
-
+      <AskArcLink />
       <section><SectionHeading title="Latest deployments" href="/deployments" /><div className="panel"><ul className="panel-list">{recent.map(deployment => <li key={deployment.id}><Link className="release-row" href={`/deployments/${deployment.id}`}><span className="release-icon"><GitBranch size={16} /></span><span className="min-w-0"><strong>{state.projects.find(p => p.id === deployment.projectId)?.name ?? 'Project'}</strong><small className="block truncate text-faint">{deployment.commitMessage || deployment.sourceLabel}</small></span><span className="release-branch">{deployment.branch ?? 'Direct upload'}</span><DeploymentStatusView value={deployment.status} /><time className="text-faint">{formatRelative(deployment.createdAt, now)}</time></Link></li>)}{!recent.length && <li className="p-5 text-muted">Your first deployment will appear here.</li>}</ul></div></section>
 
       <div className="overview-lower">
@@ -99,14 +101,7 @@ export function OverviewView() {
 
         <section>
           <SectionHeading title="Recent activity" href="/activity" />
-          <ul className="panel activity-timeline dashboard-summary-card">
-            {activity.map((event) => <li key={event.id} className="activity-row">
-              {event.result === "success" ? <Check aria-hidden /> : <CircleAlert aria-hidden className="text-faint" />}
-              <span className="min-w-0">{event.href ? <Link href={event.href} className="font-medium hover:underline">{event.action}</Link> : <span className="font-medium">{event.action}</span>}<span className="block truncate text-[11px] text-faint">{event.objectName}</span></span>
-              <time dateTime={event.timestamp}>{formatRelative(event.timestamp, now)}</time>
-            </li>)}
-            {activity.length === 0 ? <li className="p-5 text-sm text-muted">Changes to this workspace will appear here.</li> : null}
-          </ul>
+          <ActivitySummary events={state.activity} recent={activity} now={now} />
         </section>
       </div>
     </div>
@@ -117,6 +112,44 @@ function Metric({ label, value, meter }: { label: string; value: string; meter: 
   return <div className="resource-stat"><dt>{label}</dt><dd>{value}</dd><span className="resource-segments" role="meter" aria-label={label} aria-valuenow={Math.round(meter)} aria-valuemin={0} aria-valuemax={100}>{Array.from({length:20},(_,i)=><i key={i} data-filled={i < Math.ceil(meter / 5)} />)}</span></div>
 }
 
-function Stat({ href, icon, label, value, detail }: { href: string; icon: React.ReactNode; label: string; value: number; detail: string }) {
-  return <Link href={href} className="overview-stat"><span className="stat-label">{label}{icon}</span><strong>{value}<ArrowUpRight /></strong><small>{detail}</small></Link>
+function Stat({ href, icon: Icon, label, value, detail }: { href: string; icon: AnimatedIcon; label: string; value: number; detail: string }) {
+  const { ref, hostProps } = useIconAnimation()
+  return <Link href={href} className="overview-stat" {...hostProps}><span className="stat-label">{label}<Icon ref={ref} size={15} className="stat-animated-icon" /></span><strong>{value}<ArrowUpRight /></strong><small>{detail}</small></Link>
+}
+
+function AskArcLink() {
+  const { ref, hostProps } = useIconAnimation()
+  return <Link href="/chat" className="overview-chat" {...hostProps}><span className="chat-spark"><SparklesIcon ref={ref} size={20} className="stat-animated-icon" /></span><span><strong>Ask Arc — a second pair of eyes on your projects.</strong><small>Ask what’s running, check a deployment, or find what needs attention.</small></span><span className="chat-open">Ask Arc<ArrowUpRight size={15} /></span></Link>
+}
+
+function ActivitySummary({ events, recent, now }: { events: ActivityEvent[]; recent: ActivityEvent[]; now: number }) {
+  const succeeded = events.filter((event) => event.result === "success").length
+  const flagged = events.filter((event) => event.result === "warning" || event.result === "error").length
+  const other = events.length - succeeded - flagged
+  const latest = events[0]
+  const share = (count: number) => events.length ? Math.round(count / events.length * 20) : 0
+  const filledOk = share(succeeded)
+  const filledFlag = Math.min(20 - filledOk, share(flagged))
+  return <div className="panel activity-summary dashboard-summary-card">
+    <div className="flex items-start justify-between gap-3">
+      <div><Link href="/activity" className="text-sm font-semibold hover:underline">Workspace activity</Link><p className="mt-1 text-xs text-faint">{events.length} events recorded{latest ? ` · latest ${formatRelative(latest.timestamp, now)}` : ""}</p></div>
+      <span className="activity-state" data-tone={flagged ? "attention" : "ok"}>{flagged ? <CircleAlert aria-hidden /> : <Check aria-hidden />}{flagged ? `${flagged} to review` : "All clear"}</span>
+    </div>
+    <p className="mt-3 truncate font-mono text-xs text-muted">{latest ? `${latest.actor} · ${latest.action.toLowerCase()} · ${latest.objectName}` : "No changes yet"}</p>
+    <dl className="activity-counts">
+      <div><dt>Succeeded</dt><dd>{succeeded}</dd></div>
+      <div><dt>Needs review</dt><dd>{flagged}</dd></div>
+      <div><dt>Other</dt><dd>{other}</dd></div>
+    </dl>
+    <span className="resource-segments activity-segments" role="img" aria-label={`${succeeded} of ${events.length} events succeeded`}>{Array.from({ length: 20 }, (_, i) => <i key={i} data-filled={i < filledOk ? "ok" : i < filledOk + filledFlag ? "flag" : "none"} />)}</span>
+    <hr className="hairline my-5" />
+    <ul className="activity-mini">
+      {recent.map((event) => <li key={event.id} data-result={event.result}>
+        <span className="activity-mini-icon">{event.result === "success" ? <Check aria-hidden /> : <CircleAlert aria-hidden />}</span>
+        <span className="min-w-0 flex-1">{event.href ? <Link href={event.href} className="font-medium hover:underline">{event.action}</Link> : <span className="font-medium">{event.action}</span>}<small>{event.objectName}</small></span>
+        <time dateTime={event.timestamp}>{formatRelative(event.timestamp, now)}</time>
+      </li>)}
+      {recent.length === 0 ? <li className="text-sm text-muted">Changes to this workspace will appear here.</li> : null}
+    </ul>
+  </div>
 }
