@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useForm, useWatch } from "react-hook-form"
 import { z } from "zod"
 import Link from "next/link"
-import { ArrowRight, Check, Container, GitBranch, Layers, Rocket, Server, Upload } from "lucide-react"
+import { ArrowRight, Check, Container, FileArchive, FolderGit2, FolderUp, GitBranch, Layers, Lock, Rocket, ScanSearch, Server, SlidersHorizontal, Upload, X } from "lucide-react"
 import { IconTile, SectionHeading, Tag } from "@/components/ui/kit"
 import { GitHubMark } from "@/components/brand"
 import { PageHeader } from "@/components/page-header"
@@ -59,6 +59,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 type Stage = "choose" | "github" | "upload" | "git" | "image" | "compose" | "analyze" | "configure"
+const SOURCE_STAGES: Stage[] = ["choose", "github", "upload", "git", "image", "compose"]
 
 export function NewProjectView() {
   const state = useDeployState()
@@ -68,7 +69,20 @@ export function NewProjectView() {
   const toast = useToast()
   const reduced = useReducedMotion()
   const initial = params.get("source")
-  const [stage, setStage] = useState<Stage>(initial === "github" || initial === "upload" ? initial : "choose")
+  // Source screens live in the URL (?source=upload) so Back and the browser
+  // back button return to the source picker; analyze/configure are in-page.
+  const sourceStage: Stage = SOURCE_STAGES.includes(initial as Stage) ? (initial as Stage) : "choose"
+  const [flow, setFlow] = useState<{ stage: "analyze" | "configure"; from: string | null } | null>(null)
+  const stage: Stage = flow && flow.from === initial ? flow.stage : sourceStage
+  function setStage(next: Stage) {
+    if (next === "analyze" || next === "configure") {
+      setFlow({ stage: next, from: initial })
+      return
+    }
+    setFlow(null)
+    if (next === sourceStage) return
+    router.push(next === "choose" ? "/projects/new" : `/projects/new?source=${next}`)
+  }
   const [repoQuery, setRepoQuery] = useState("")
   const [repo, setRepo] = useState<GitRepository | null>(null)
   const [branch, setBranch] = useState("main")
@@ -248,6 +262,24 @@ export function NewProjectView() {
     }
   }
 
+  const header = (() => {
+    switch (stage) {
+      case "github":
+        return <PageHeader icon={FolderGit2} kicker="New project · Source" title="Import from GitHub" description={state.github.connected ? `Connected as ${state.github.accountName} · @${state.github.accountLogin}. Pick a repository and branch.` : "Connect the mock GitHub account to browse repositories."} />
+      case "upload":
+        return <PageHeader icon={Upload} kicker="New project · Source" title="Upload a project" description="ZIP, tar.gz, or a local folder. Nothing leaves this browser in Phase 1." />
+      case "git":
+      case "image":
+      case "compose":
+        return <PageHeader icon={stage === "git" ? GitBranch : stage === "image" ? Container : Layers} kicker="New project · Source" title={stage === "git" ? "Git repository" : stage === "image" ? "Docker image" : "Docker Compose"} description="Phase 1 records the source and simulates detection. It does not pull or build yet." />
+      case "analyze":
+        return <PageHeader icon={ScanSearch} kicker="New project · Analyze" title={analysis?.failed ? "Framework detection failed" : "Analyzing project"} description={analysis?.summary ?? "Reading the project files."} />
+      case "configure":
+        return <PageHeader icon={SlidersHorizontal} kicker="New project · Configure" title="Configure deployment" description="The common path is enough to deploy. Resource limits stay folded until you need them." />
+      default:
+        return <PageHeader icon={Rocket} kicker="New project" title="Deploy something new" description="Bring an application online from source code, a local project, or an existing container." />
+    }
+  })()
   const imported = repo?.importedProjectId ? state.projects.find((project) => project.id === repo.importedProjectId) : null
 
   return (
@@ -263,12 +295,12 @@ export function NewProjectView() {
           )
         })}
       </ol>
-      <div className="np-layout">
+      {header}
+      <div className="np-layout" data-stage={stage}>
       <div className="np-main">
       {stage === "choose" ? (
         <>
-          <PageHeader icon={Rocket} kicker="New project" title="Deploy something new" description="Bring an application online from source code, a local project, or an existing container." />
-          <section className="mt-8">
+          <section>
             <SectionHeading title="Choose a source" />
             <div className="np-primary">
               <button type="button" className="np-card pressable" onClick={() => setStage("github")}>
@@ -328,7 +360,6 @@ export function NewProjectView() {
 
       {stage === "github" ? (
         <section>
-          <PageHeader title="Import from GitHub" description={state.github.connected ? `Connected as ${state.github.accountName} · ${state.github.accountLogin}` : "Connect the mock GitHub account to browse repositories."} />
           {!state.github.connected ? (
             <Button className="mt-6" variant="primary" onClick={() => void deploy.connectGitHub().then(() => toast({ title: "GitHub connected", description: "Roberadesissaii" }))}>
               Connect GitHub
@@ -394,9 +425,10 @@ export function NewProjectView() {
 
       {stage === "upload" ? (
         <section>
-          <PageHeader title="Upload a project" description="ZIP, tar.gz, or a local folder. Nothing leaves this browser in Phase 1." />
+          <div className="np-upload">
+          <div className="np-upload-main">
           <div
-            className="drop-target mt-8"
+            className="np-drop"
             data-over={undefined}
             onDragOver={(event) => {
               event.preventDefault()
@@ -411,11 +443,12 @@ export function NewProjectView() {
               if (event.dataTransfer.files.length) void acceptFiles(event.dataTransfer.files)
             }}
           >
-            <p className="font-medium">Drop a project archive</p>
-            <p className="mt-1 text-sm text-muted">or choose a file or folder</p>
-            <div className="mt-4 flex gap-2">
-              <label className="btn btn-secondary">
-                Browse files
+            <span className="np-drop-icon"><Upload aria-hidden /></span>
+            <p className="np-drop-title">Drop a project archive here</p>
+            <p className="np-drop-sub">or choose a file or a whole folder from your computer</p>
+            <div className="np-drop-actions">
+              <label className="btn btn-primary">
+                <FileArchive aria-hidden />Browse files
                 <input
                   className="sr-only"
                   type="file"
@@ -425,8 +458,8 @@ export function NewProjectView() {
                   }}
                 />
               </label>
-              <label className="btn btn-ghost">
-                Browse folder
+              <label className="btn btn-secondary">
+                <FolderUp aria-hidden />Browse folder
                 <input
                   ref={folderRef}
                   className="sr-only"
@@ -438,45 +471,51 @@ export function NewProjectView() {
                 />
               </label>
             </div>
+            <div className="np-drop-formats">{[".zip", ".tar.gz", ".tgz", "folder"].map((format) => <Tag key={format}>{format}</Tag>)}</div>
           </div>
           {upload ? (
-            <div className="mt-4">
-              <div className="flex items-baseline justify-between gap-3">
-                <p className="font-medium">{upload.name}</p>
-                <p className="text-sm text-muted">{formatBytes(upload.size)}</p>
+            <div className="np-upload-file" data-error={Boolean(upload.error)}>
+              <IconTile icon={FileArchive} tone={upload.error ? "danger" : upload.progress >= 1 ? "success" : "brand"} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="truncate text-[13px] font-semibold">{upload.name}</p>
+                  <p className="text-xs text-faint tabular-nums">{upload.error ? "Failed" : `${Math.round(upload.progress * 100)}%`} · {formatBytes(upload.size)}</p>
+                </div>
+                <div className="np-upload-bar" role="meter" aria-label="Upload progress" aria-valuenow={Math.round(upload.progress * 100)} aria-valuemin={0} aria-valuemax={100}>
+                  <span style={{ width: `${upload.progress * 100}%` }} />
+                </div>
+                {upload.error ? <p className="field-error mt-2">{upload.error}</p> : null}
               </div>
-              <div className="meter mt-3" aria-label="Upload progress" role="meter" aria-valuenow={Math.round(upload.progress * 100)} aria-valuemin={0} aria-valuemax={100}>
-                <span style={{ width: `${upload.progress * 100}%` }} />
-              </div>
-              {upload.error ? <p className="field-error mt-2">{upload.error}</p> : null}
-              <div className="mt-3 flex gap-2">
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    cancelUpload.current = true
-                    setUpload(null)
-                  }}
-                >
-                  {upload.progress < 1 && !upload.error ? "Cancel" : "Remove"}
-                </Button>
-                {upload.error ? (
-                  <Button variant="secondary" onClick={() => setUpload(null)}>
-                    Retry
-                  </Button>
-                ) : null}
-              </div>
+              {upload.error ? <Button variant="secondary" size="sm" onClick={() => setUpload(null)}>Retry</Button> : null}
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label={upload.progress < 1 && !upload.error ? "Cancel upload" : "Remove file"}
+                onClick={() => {
+                  cancelUpload.current = true
+                  setUpload(null)
+                }}
+              >
+                <X aria-hidden />
+              </button>
             </div>
           ) : null}
-          <Button className="mt-6" variant="ghost" onClick={() => setStage("choose")}>Back</Button>
+          </div>
+          <div className="np-upload-tips">
+            <p className="domain-label">What we look for</p>
+            <ul>
+              <li><Check aria-hidden /><span><strong>A manifest</strong><small>package.json, requirements.txt, or a Dockerfile.</small></span></li>
+              <li><Check aria-hidden /><span><strong>A start command</strong><small>Detected from scripts, or set it on the next step.</small></span></li>
+              <li><Lock aria-hidden /><span><strong>No secrets in the archive</strong><small>Add them as environment variables instead.</small></span></li>
+            </ul>
+          </div>
+          </div>
+          <Button className="mt-5 self-start" variant="ghost" onClick={() => setStage("choose")}><ArrowRight aria-hidden className="rotate-180" />Choose another source</Button>
         </section>
       ) : null}
 
       {stage === "git" || stage === "image" || stage === "compose" ? (
         <section>
-          <PageHeader
-            title={stage === "git" ? "Git repository" : stage === "image" ? "Docker image" : "Docker Compose"}
-            description="Phase 1 records the source and simulates detection. It does not pull or build yet."
-          />
           <div className="mt-6">
             {stage === "git" ? (
               <Field label="Repository URL" hint="Example: https://github.com/Roberadesissaii/notes-api.git">
@@ -520,7 +559,6 @@ export function NewProjectView() {
 
       {stage === "analyze" && analysis ? (
         <section>
-          <PageHeader title={analysis.failed ? "Framework detection failed" : "Analyzing project"} description={analysis.summary} />
           <ul className="mt-8 space-y-2">
             {analysis.checks.slice(0, reduced ? analysis.checks.length : shownChecks).map((check) => (
               <li key={check.label} className="flex items-center gap-3 text-sm">
@@ -552,7 +590,6 @@ export function NewProjectView() {
           onSubmit={form.handleSubmit(onDeploy)}
           className="mt-2"
         >
-          <PageHeader title="Configure deployment" description="The common path is enough to deploy. Resource limits stay folded until you need them." />
           <div className="mt-8 space-y-8">
             <section className="panel space-y-4 p-5">
               <h2 className="text-[15px] font-semibold">General</h2>
@@ -668,6 +705,7 @@ export function NewProjectView() {
       </div>
       <NewProjectAside stepIndex={STEPS.findIndex((item) => item.stages.includes(stage))} suggestedPort={suggestedPort} />
       </div>
+      {stage === "choose" ? <RecentlyDeployed /> : null}
     </div>
   )
 }
@@ -683,7 +721,6 @@ function NewProjectAside({ stepIndex, suggestedPort }: { stepIndex: number; sugg
   const state = useDeployState()
   if (!state) return null
   const server = homeServer(state)
-  const recent = [...state.projects].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)).slice(0, 3)
   return (
     <aside className="np-aside" aria-label="Deployment details">
       {server ? (
@@ -712,22 +749,30 @@ function NewProjectAside({ stepIndex, suggestedPort }: { stepIndex: number; sugg
           ))}
         </ol>
       </section>
-      {recent.length ? (
-        <section className="np-aside-card">
-          <p className="np-aside-label">Recently deployed</p>
-          <ul className="np-recent">
-            {recent.map((project) => (
-              <li key={project.id}>
-                <Link href={`/projects/${project.id}`}>
-                  <span className="min-w-0 flex-1"><strong>{project.name}</strong><small>{FRAMEWORKS[project.framework].label} · <span className="capitalize">{project.environment}</span></small></span>
-                  <ArrowRight aria-hidden />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
     </aside>
+  )
+}
+
+function RecentlyDeployed() {
+  const state = useDeployState()
+  if (!state) return null
+  const recent = [...state.projects].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)).slice(0, 3)
+  if (!recent.length) return null
+  return (
+    <section className="np-recent-row">
+      <SectionHeading title="Recently deployed" href="/projects" action="All projects" />
+      <ul className="np-recent-grid">
+        {recent.map((project) => (
+          <li key={project.id}>
+            <Link href={`/projects/${project.id}`} className="np-mini pressable">
+              <IconTile icon={FolderGit2} tone="brand" />
+              <span className="min-w-0 flex-1"><strong>{project.name}</strong><small>{FRAMEWORKS[project.framework].label} · <span className="capitalize">{project.environment}</span></small></span>
+              <ArrowRight aria-hidden className="np-mini-arrow" />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 

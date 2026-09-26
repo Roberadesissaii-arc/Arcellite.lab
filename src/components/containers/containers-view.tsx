@@ -5,7 +5,7 @@ import { useState } from "react"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { PageSkeleton } from "@/components/ui/bits"
-import { EmptyPanel, IconTile, SearchField, SectionHeading, StatCard, StatGrid } from "@/components/ui/kit"
+import { EmptyPanel, IconTile, SearchField, SectionHeading, SegmentMeter, StatCard, StatGrid } from "@/components/ui/kit"
 import { SelectInput } from "@/components/ui/fields"
 import { Modal, ConfirmDialog } from "@/components/ui/overlays"
 import { ContainerStatusView } from "@/components/ui/status"
@@ -15,7 +15,7 @@ import { useDeploy, useDeployState } from "@/lib/deploy/react"
 import { DeployError, type Container } from "@/lib/deploy/types"
 import { useNow } from "@/lib/use-now"
 import Link from "next/link"
-import { Box, Boxes, CirclePlay, Cog, Cpu, Database, MemoryStick } from "lucide-react"
+import { Box, Boxes, CirclePlay, Clock, Cog, Cpu, Database, FolderKanban, MemoryStick, Play, Plug, RotateCcw, ScrollText, Server, Square, Terminal } from "lucide-react"
 
 export function ContainersView() {
   const state = useDeployState()
@@ -123,24 +123,41 @@ export function ContainersView() {
           </div>
         )}
       </section>
-      <Modal open={Boolean(selected)} onOpenChange={(open) => { if (!open) setPicked(null) }} title={selected?.name ?? "Container"} description={selected?.image}>
-        {selected ? (
-          <div className="space-y-3 text-sm">
-            <p><span className="text-muted">State</span> · {selected.state}</p>
-            <p><span className="text-muted">Command</span> · <span className="font-mono text-[13px]">{selected.command}</span></p>
-            <p><span className="text-muted">Restart</span> · {selected.restartPolicy}</p>
-            <p><span className="text-muted">Ports</span> · {selected.ports.length ? selected.ports.map((port) => `${port.host ?? "internal"}:${port.container}/${port.protocol}`).join(", ") : "none published"}</p>
-            <div className="flex flex-wrap gap-2 pt-2">
-              <Link className="btn btn-secondary" href={`/logs`}>Open logs</Link>
-              {selected.state === "running" || selected.state === "starting" || selected.state === "restarting" ? (
-                <Button variant="danger" onClick={() => setConfirm({ id: selected.id, action: "stop" })}>Stop</Button>
-              ) : (
-                <Button variant="primary" onClick={() => void act(selected, "start")}>Start</Button>
-              )}
-              <Button variant="secondary" onClick={() => setConfirm({ id: selected.id, action: "restart" })}>Restart</Button>
+      <Modal open={Boolean(selected)} onOpenChange={(open) => { if (!open) setPicked(null) }} title={selected?.name ?? "Container"} description={selected?.image} icon={Box} wide>
+        {selected ? (() => {
+          const host = state.servers.find((item) => item.id === selected.serverId)
+          const project = state.projects.find((item) => item.id === selected.projectId)
+          const live = selected.state === "running" || selected.state === "starting" || selected.state === "restarting"
+          return (
+            <div className="inspect">
+              <div className="inspect-status">
+                <ContainerStatusView value={selected.state} />
+                <span className="inspect-since"><Clock aria-hidden />{selected.startedAt && live ? `Up ${formatUptime(selected.startedAt, now)}` : "Not running"}</span>
+                <span className="inspect-role">{selected.role}</span>
+              </div>
+              <div className="inspect-meters">
+                <div><span><Cpu aria-hidden />CPU</span><strong>{selected.cpuPercent}%</strong><SegmentMeter value={selected.cpuPercent} label="CPU" /></div>
+                <div><span><MemoryStick aria-hidden />Memory</span><strong>{selected.memoryMb} MB</strong><SegmentMeter value={Math.min(100, (selected.memoryMb / 2048) * 100)} label="Memory" /></div>
+              </div>
+              <dl className="inspect-grid">
+                <div><dt><Server aria-hidden />Server</dt><dd>{host?.name ?? "Unknown"}</dd></div>
+                <div><dt><FolderKanban aria-hidden />Project</dt><dd>{project ? <Link href={`/projects/${project.id}`} className="text-[var(--brand-primary)]">{project.name}</Link> : "Standalone"}</dd></div>
+                <div><dt><RotateCcw aria-hidden />Restart policy</dt><dd><code>{selected.restartPolicy}</code></dd></div>
+                <div><dt><Plug aria-hidden />Ports</dt><dd className="flex flex-wrap gap-1.5">{selected.ports.length ? selected.ports.map((port) => <code key={`${port.container}-${port.protocol}`}>{port.host ? `:${port.host} → ` : ""}{port.container}/{port.protocol}</code>) : <span className="text-faint">None published</span>}</dd></div>
+                <div className="inspect-wide"><dt><Terminal aria-hidden />Command</dt><dd><code className="inspect-command">{selected.command}</code></dd></div>
+              </dl>
+              <div className="dialog-actions">
+                <Link className="btn btn-ghost mr-auto" href={`/logs`}><ScrollText aria-hidden />Open logs</Link>
+                <Button variant="secondary" onClick={() => setConfirm({ id: selected.id, action: "restart" })}><RotateCcw aria-hidden />Restart</Button>
+                {live ? (
+                  <Button variant="danger" onClick={() => setConfirm({ id: selected.id, action: "stop" })}><Square aria-hidden />Stop</Button>
+                ) : (
+                  <Button variant="primary" onClick={() => void act(selected, "start")}><Play aria-hidden />Start</Button>
+                )}
+              </div>
             </div>
-          </div>
-        ) : null}
+          )
+        })() : null}
       </Modal>
       <ConfirmDialog
         open={Boolean(confirm)}

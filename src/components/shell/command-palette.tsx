@@ -51,7 +51,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
       <Dialog.Portal>
         <Dialog.Overlay className="overlay-scrim z-50" />
         <Dialog.Content
-          className="workspace-surface material fixed left-1/2 top-[14vh] z-50 w-[min(560px,calc(100%-24px))] -translate-x-1/2 overflow-hidden rounded-[var(--radius-sheet)] border border-[var(--border-subtle)] shadow-[var(--shadow-overlay)]"
+          className="workspace-surface material fixed left-[calc(var(--dialog-offset)+(100vw-var(--dialog-offset))/2)] top-[14vh] z-50 w-[min(560px,calc(100vw-var(--dialog-offset)-24px))] -translate-x-1/2 overflow-hidden rounded-[var(--radius-sheet)] border border-[var(--border-subtle)] shadow-[var(--shadow-overlay)]"
           aria-describedby={undefined}
         >
           <Dialog.Title className="sr-only">Command palette</Dialog.Title>

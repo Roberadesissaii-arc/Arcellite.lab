@@ -1,8 +1,8 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import Link from "next/link"
-import { ArrowUpRight, ChevronLeft, ChevronRight, Copy, Eye, EyeOff, FolderKanban, KeyRound, Layers, Lock, LockOpen, Plus, ShieldCheck, Trash2 } from "lucide-react"
+import { ArrowUpRight, ChevronLeft, ChevronRight, Copy, Eye, EyeOff, FileUp, FolderKanban, KeyRound, Layers, Lock, LockOpen, Plus, ShieldCheck, Trash2 } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { copyText, PageSkeleton } from "@/components/ui/bits"
@@ -13,6 +13,7 @@ import { useToast } from "@/components/ui/toast"
 import { envError } from "@/components/projects/env-editor"
 import { useDeploy, useDeployState } from "@/lib/deploy/react"
 import type { EnvironmentVariable } from "@/lib/deploy/types"
+import { looksSecret, parseDotenv } from "@/lib/deploy/dotenv"
 
 type Scope = EnvironmentVariable["scope"]
 const SCOPES: { value: Scope | "any"; label: string }[] = [
@@ -44,6 +45,8 @@ export function EnvironmentView() {
   const [draft, setDraft] = useState({ key: "", value: "", scope: "all" as Scope, secret: true })
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(0)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [importing, setImporting] = useState<{ file: string; skipped: number[]; scope: Scope; rows: { key: string; value: string; secret: boolean; include: boolean }[] } | null>(null)
 
   const project = state?.projects.find((item) => item.id === picked) ?? state?.projects[0] ?? null
   const rows = useMemo(() => {
@@ -80,7 +83,26 @@ export function EnvironmentView() {
         kicker="Observe"
         title="Environment"
         description="Variables and secrets for every project, kept apart from source code. Secrets stay masked and are injected only when a container starts."
-        actions={project ? <Button variant="primary" onClick={() => { setError(null); setDraft({ key: "", value: "", scope: "all", secret: true }); setAdding(true) }}><Plus aria-hidden />Add variable</Button> : null}
+        actions={project ? (
+          <>
+            <input ref={fileRef} type="file" accept=".env,.txt,text/plain" className="sr-only" tabIndex={-1} aria-hidden onChange={(event) => {
+              const file = event.target.files?.[0]
+              event.target.value = ""
+              if (!file) return
+              void file.text().then((text) => {
+                const parsed = parseDotenv(text)
+                if (!parsed.entries.length) {
+                  toast({ title: "Nothing to import", description: `${file.name} has no KEY=VALUE lines.` })
+                  return
+                }
+                setError(null)
+                setImporting({ file: file.name, skipped: parsed.skipped, scope: "all", rows: parsed.entries.map((entry) => ({ key: entry.key, value: entry.value, secret: looksSecret(entry.key), include: true })) })
+              })
+            }} />
+            <Button variant="secondary" onClick={() => fileRef.current?.click()}><FileUp aria-hidden />Upload .env</Button>
+            <Button variant="primary" onClick={() => { setError(null); setDraft({ key: "", value: "", scope: "all", secret: true }); setAdding(true) }}><Plus aria-hidden />Add variable</Button>
+          </>
+        ) : null}
       />
       <StatGrid>
         <StatCard icon={Layers} tone="brand" label="Variables" value={all.length} detail={`Across ${state.projects.length} projects`} />
@@ -220,6 +242,60 @@ export function EnvironmentView() {
             <Button type="submit" variant="primary">Add variable</Button>
           </div>
         </form>
+      </Modal>
+      <Modal open={Boolean(importing)} onOpenChange={(open) => { if (!open) setImporting(null) }} title="Import variables" description={importing && project ? `${importing.file} → ${project.name}. Existing names in the same scope are updated.` : undefined} wide>
+        {importing && project ? (() => {
+          const chosen = importing.rows.filter((row) => row.include)
+          const existing = new Set(project.env.filter((item) => item.scope === importing.scope).map((item) => item.key))
+          const updates = chosen.filter((row) => existing.has(row.key)).length
+          const setRow = (index: number, patch: Partial<(typeof importing.rows)[number]>) => setImporting({ ...importing, rows: importing.rows.map((row, i) => (i === index ? { ...row, ...patch } : row)) })
+          return (
+            <form className="env-import" onSubmit={(event) => {
+              event.preventDefault()
+              setError(null)
+              const incoming = new Map(chosen.map((row) => [row.key, row]))
+              const kept = project.env.map((item) => {
+                const row = item.scope === importing.scope ? incoming.get(item.key) : undefined
+                if (!row) return item
+                incoming.delete(item.key)
+                return { ...item, value: row.value, secret: row.secret }
+              })
+              const added = [...incoming.values()].map((row) => ({ id: crypto.randomUUID(), key: row.key, value: row.value, scope: importing.scope, secret: row.secret }))
+              void save([...kept, ...added], `Imported ${chosen.length} variable${chosen.length === 1 ? "" : "s"}`).then((ok) => { if (ok) setImporting(null) })
+            }}>
+              <div className="env-import-summary">
+                <span className="env-import-file"><FileUp aria-hidden /><strong>{importing.file}</strong></span>
+                <Tag tone="brand">{chosen.length - updates} new</Tag>
+                {updates ? <Tag tone="warning">{updates} updated</Tag> : null}
+                {importing.skipped.length ? <Tag>{importing.skipped.length} line{importing.skipped.length === 1 ? "" : "s"} skipped</Tag> : null}
+                <div className="ml-auto w-44">
+                  <SelectInput aria-label="Scope" value={importing.scope} onChange={(event) => setImporting({ ...importing, scope: event.target.value as Scope })}>
+                    {(Object.keys(SCOPE_LABEL) as Scope[]).map((item) => <option key={item} value={item}>{SCOPE_LABEL[item]}</option>)}
+                  </SelectInput>
+                </div>
+              </div>
+              <ul className="env-import-list">
+                {importing.rows.map((row, index) => (
+                  <li key={row.key} data-off={!row.include}>
+                    <input type="checkbox" checked={row.include} aria-label={`Import ${row.key}`} onChange={(event) => setRow(index, { include: event.target.checked })} />
+                    <code className="env-import-key">{row.key}</code>
+                    <span className="env-import-value">{row.secret ? mask(row.value) : row.value || <em>empty</em>}</span>
+                    {existing.has(row.key) ? <Tag tone="warning">Update</Tag> : null}
+                    <button type="button" className="env-import-secret" data-on={row.secret} onClick={() => setRow(index, { secret: !row.secret })} aria-pressed={row.secret}>
+                      {row.secret ? <Lock aria-hidden /> : <LockOpen aria-hidden />}{row.secret ? "Secret" : "Plain"}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <p className="env-import-note"><ShieldCheck aria-hidden />Names that look like credentials are marked secret. Values stay in this browser in Phase 1.</p>
+              {error ? <p className="field-error">{error}</p> : null}
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="ghost" onClick={() => setImporting(null)}>Cancel</Button>
+                <Button type="submit" variant="primary" disabled={!chosen.length}>Import {chosen.length} variable{chosen.length === 1 ? "" : "s"}</Button>
+              </div>
+            </form>
+          )
+        })() : null}
       </Modal>
       <ConfirmDialog
         open={Boolean(removing)}

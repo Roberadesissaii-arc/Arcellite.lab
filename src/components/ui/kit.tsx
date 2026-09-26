@@ -1,6 +1,53 @@
+"use client"
+
 import Link from "next/link"
-import { ArrowRight, ArrowUpRight, Search, type LucideIcon } from "lucide-react"
+import { createElement } from "react"
+import {
+  AlertTriangle, ArchiveRestore, ArrowRight, ArrowUpRight, Box, Boxes, CircleAlert, CircleCheck, CirclePlay, CircleUser, Clock, Cpu, Database,
+  FolderKanban, GalleryVerticalEnd, GitBranch, Globe2, Hammer, HardDrive, Info, KeyRound, Layers, Loader, Lock, MemoryStick, Network, Radio,
+  Rocket, Search, Server, ShieldCheck, Terminal, Unplug, type LucideIcon,
+} from "lucide-react"
+import {
+  BadgeAlertIcon, BellIcon, BoxIcon, BoxesIcon, ChartPieIcon, CircleCheckIcon, ClockIcon, CpuIcon, DatabaseBackupIcon, DatabaseIcon, EarthIcon,
+  FolderKanbanIcon, GalleryVerticalEndIcon, GitBranchIcon, HammerIcon, HardDriveDownloadIcon, KeyIcon, LayersIcon, LoaderCircleIcon, LockIcon,
+  MonitorCheckIcon, PlayIcon, PlugZapIcon, RocketIcon, ShieldCheckIcon, TerminalIcon, UserIcon, WaypointsIcon, WifiIcon, ZapOffIcon,
+} from "lucide-animated"
+import { type AnimatedIcon, useIconAnimation } from "@/components/ui/animated-icon"
 import { cn } from "@/lib/cn"
+
+/** Animated stand-ins so every stat card's icon moves on hover, like the overview. */
+const ANIMATED = new Map<LucideIcon, AnimatedIcon>([
+  [AlertTriangle, BadgeAlertIcon],
+  [ArchiveRestore, DatabaseBackupIcon],
+  [Box, BoxIcon],
+  [Boxes, BoxesIcon],
+  [CircleAlert, ZapOffIcon],
+  [CircleCheck, CircleCheckIcon],
+  [CirclePlay, PlayIcon],
+  [CircleUser, UserIcon],
+  [Clock, ClockIcon],
+  [Cpu, CpuIcon],
+  [Database, DatabaseIcon],
+  [FolderKanban, FolderKanbanIcon],
+  [GalleryVerticalEnd, GalleryVerticalEndIcon],
+  [GitBranch, GitBranchIcon],
+  [Globe2, EarthIcon],
+  [Hammer, HammerIcon],
+  [HardDrive, HardDriveDownloadIcon],
+  [Info, BellIcon],
+  [KeyRound, KeyIcon],
+  [Layers, LayersIcon],
+  [Loader, LoaderCircleIcon],
+  [Lock, LockIcon],
+  [MemoryStick, ChartPieIcon],
+  [Network, WaypointsIcon],
+  [Radio, WifiIcon],
+  [Rocket, RocketIcon],
+  [Server, MonitorCheckIcon],
+  [ShieldCheck, ShieldCheckIcon],
+  [Terminal, TerminalIcon],
+  [Unplug, PlugZapIcon],
+])
 
 export type Tone = "brand" | "success" | "warning" | "danger" | "info" | "neutral"
 
@@ -19,6 +66,7 @@ export function StatCard({
   value,
   detail,
   icon,
+  animated,
   tone = "neutral",
   href,
 }: {
@@ -26,15 +74,22 @@ export function StatCard({
   value: React.ReactNode
   detail?: React.ReactNode
   icon: LucideIcon
+  /** Overrides the animated glyph picked for `icon`. */
+  animated?: AnimatedIcon
   tone?: Tone
   href?: string
 }) {
+  const { ref, bind } = useIconAnimation()
+  const Glyph = animated ?? ANIMATED.get(icon)
   const body = <>
-    <span className="stat-card-head"><span>{label}</span><IconTile icon={icon} tone={tone} size="sm" /></span>
+    <span className="stat-card-head">
+      <span>{label}</span>
+      {Glyph ? <span className="icon-tile" data-tone={tone} data-size="sm">{createElement(Glyph, { ref, size: 14, className: "animated-glyph" })}</span> : <IconTile icon={icon} tone={tone} size="sm" />}
+    </span>
     <strong className="stat-card-value"><span className="min-w-0 truncate">{value}</span>{href ? <ArrowUpRight aria-hidden /> : null}</strong>
     {detail ? <small className="stat-card-detail">{detail}</small> : null}
   </>
-  return href ? <Link href={href} className="stat-card" data-link>{body}</Link> : <div className="stat-card">{body}</div>
+  return href ? <Link href={href} className="stat-card" data-link {...bind}>{body}</Link> : <div className="stat-card" {...bind}>{body}</div>
 }
 
 export function SectionHeading({
