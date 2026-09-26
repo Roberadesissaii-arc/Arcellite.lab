@@ -5,7 +5,7 @@ import { useState } from "react"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { PageSkeleton } from "@/components/ui/bits"
-import { EmptyPanel, ItemList, ItemRow, SectionHeading, StatCard, StatGrid } from "@/components/ui/kit"
+import { EmptyPanel, IconTile, SearchField, SectionHeading, StatCard, StatGrid } from "@/components/ui/kit"
 import { SelectInput } from "@/components/ui/fields"
 import { Modal, ConfirmDialog } from "@/components/ui/overlays"
 import { ContainerStatusView } from "@/components/ui/status"
@@ -24,12 +24,22 @@ export function ContainersView() {
   const now = useNow()
   const params = useSearchParams()
   const [serverId, setServerId] = useState("all")
+  const [search, setSearch] = useState("")
+  const [stateFilter, setStateFilter] = useState("all")
   const [picked, setPicked] = useState<string | null | undefined>(undefined)
   const inspect = picked === undefined ? params.get("inspect") : picked
   const [confirm, setConfirm] = useState<{ id: string; action: "stop" | "restart" } | null>(null)
 
   if (!state) return <PageSkeleton />
-  const rows = state.containers.filter((container) => serverId === "all" || container.serverId === serverId)
+  const q = search.trim().toLowerCase()
+  const rows = state.containers.filter((container) => {
+    const project = state.projects.find((item) => item.id === container.projectId)
+    return (serverId === "all" || container.serverId === serverId)
+      && (stateFilter === "all" || container.state === stateFilter)
+      && (!q || [container.name, container.image, project?.name ?? ""].some((text) => text.toLowerCase().includes(q)))
+  })
+  const maxCpu = Math.max(1, ...state.containers.map((container) => container.cpuPercent))
+  const maxMem = Math.max(1, ...state.containers.map((container) => container.memoryMb))
   const selected = state.containers.find((container) => container.id === inspect) ?? null
 
   async function act(container: Container, action: "start" | "stop" | "restart") {
@@ -60,41 +70,58 @@ export function ContainersView() {
       </StatGrid>
       <section>
         <SectionHeading title="Workloads" count={rows.length} />
-        <div className="page-toolbar">
+        <div className="page-toolbar mb-3">
+          <SearchField value={search} onChange={setSearch} placeholder="Search name, image, or project" label="Search containers" />
+          <SelectInput aria-label="State" value={stateFilter} onChange={(event) => setStateFilter(event.target.value)}>
+            <option value="all">All states</option>
+            <option value="running">Running</option>
+            <option value="starting">Starting</option>
+            <option value="restarting">Restarting</option>
+            <option value="stopped">Stopped</option>
+            <option value="exited">Exited</option>
+          </SelectInput>
           <SelectInput aria-label="Server" value={serverId} onChange={(event) => setServerId(event.target.value)}>
             <option value="all">All servers</option>
             {state.servers.map((server) => <option key={server.id} value={server.id}>{server.name}</option>)}
           </SelectInput>
-          <span className="toolbar-note">Ports show host → container</span>
         </div>
-        <div className="mt-3">
-          {rows.length === 0 ? <EmptyPanel icon={Boxes} title="No containers" body="Nothing is running on this server yet." /> : (
-            <ItemList label="Containers">
-              {rows.map((container) => {
-                const project = state.projects.find((item) => item.id === container.projectId)
-                const port = container.ports.find((item) => item.host)
-                return (
-                  <ItemRow
-                    key={container.id}
-                    onClick={() => setPicked(container.id)}
-                    icon={container.role === "data" ? Database : container.role === "worker" ? Cog : Box}
-                    tone={container.state === "running" ? "success" : container.state === "exited" ? "danger" : container.state === "stopped" ? "warning" : "info"}
-                    title={container.name}
-                    subtitle={container.image}
-                    meta={[
-                      <span key="p">{project?.name ?? "Infrastructure"}</span>,
-                      <span key="port" className="font-mono text-[11px]">{port ? `${port.host} → ${port.container}` : "internal"}</span>,
-                      <span key="up" className="text-faint">{formatUptime(container.startedAt, now)}</span>,
-                      <span key="res" className="text-faint">{container.cpuPercent}% · {container.memoryMb} MB</span>,
-                    ]}
-                    metaWidths={[120, 110, 70, 110]}
-                    trailing={<span className="w-[92px]"><ContainerStatusView value={container.state} /></span>}
-                  />
-                )
-              })}
-            </ItemList>
-          )}
-        </div>
+        {rows.length === 0 ? <EmptyPanel icon={Boxes} title="No containers match" body="Try another state, server, or search." /> : (
+          <div className="panel data-table-wrap">
+            <div className="data-table-scroll">
+              <table className="data-table container-table">
+                <colgroup>
+                  <col className="c-name" /><col className="c-project" /><col className="c-state" /><col className="c-ports" /><col className="c-uptime" /><col className="c-cpu" /><col className="c-mem" />
+                </colgroup>
+                <thead>
+                  <tr><th>Container</th><th className="c-project">Project</th><th>State</th><th className="c-ports">Ports</th><th className="c-uptime">Uptime</th><th className="c-cpu">CPU</th><th className="c-mem">Memory</th></tr>
+                </thead>
+                <tbody>
+                  {rows.map((container) => {
+                    const project = state.projects.find((item) => item.id === container.projectId)
+                    const ports = container.ports.filter((item) => item.host)
+                    return (
+                      <tr key={container.id} tabIndex={0} onClick={() => setPicked(container.id)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setPicked(container.id) } }}>
+                        <td>
+                          <span className="table-identity">
+                            <IconTile icon={container.role === "data" ? Database : container.role === "worker" ? Cog : Box} tone={container.state === "running" ? "brand" : container.state === "exited" ? "danger" : container.state === "stopped" ? "warning" : "info"} />
+                            <span className="min-w-0"><strong>{container.name}</strong><small>{container.image}</small></span>
+                          </span>
+                        </td>
+                        <td className="c-project text-muted">{project?.name ?? "Infrastructure"}</td>
+                        <td><ContainerStatusView value={container.state} /></td>
+                        <td className="c-ports">{ports.length ? ports.map((port) => <code key={port.container} className="table-code mr-1">{port.host} → {port.container}</code>) : <span className="text-faint">internal</span>}</td>
+                        <td className="c-uptime text-muted tabular-nums">{formatUptime(container.startedAt, now)}</td>
+                        <td className="c-cpu"><span className="usage-cell"><span className="usage-bar"><span style={{ width: `${Math.min(100, (container.cpuPercent / maxCpu) * 100)}%` }} /></span><span className="usage-value !w-[44px]">{container.cpuPercent}%</span></span></td>
+                        <td className="c-mem"><span className="usage-cell"><span className="usage-bar"><span style={{ width: `${Math.min(100, (container.memoryMb / maxMem) * 100)}%` }} /></span><span className="usage-value !w-[56px]">{container.memoryMb} MB</span></span></td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div className="data-table-footer"><p>Showing <strong>{rows.length}</strong> of <strong>{state.containers.length}</strong> containers</p><span className="text-faint">Bars are relative to the busiest container. Select a row to inspect it.</span></div>
+          </div>
+        )}
       </section>
       <Modal open={Boolean(selected)} onOpenChange={(open) => { if (!open) setPicked(null) }} title={selected?.name ?? "Container"} description={selected?.image}>
         {selected ? (

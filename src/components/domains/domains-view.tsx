@@ -1,11 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { Clock, Globe2, Lock, Network, Plus, ShieldCheck } from "lucide-react"
+import { Clock, Globe2, Lock, Network, Plus, SearchX, ShieldCheck } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { CopyButton, PageSkeleton } from "@/components/ui/bits"
-import { EmptyPanel, IconTile, ItemList, ItemRow, SectionHeading, StatCard, StatGrid, Tag } from "@/components/ui/kit"
+import { EmptyPanel, IconTile, SearchField, SectionHeading, StatCard, StatGrid, Tag } from "@/components/ui/kit"
 import { Field, SelectInput, TextInput } from "@/components/ui/fields"
 import { ConfirmDialog, Modal } from "@/components/ui/overlays"
 import { DomainStatusView } from "@/components/ui/status"
@@ -22,6 +22,9 @@ export function DomainsView() {
   const toast = useToast()
   const now = useNow(1000)
   const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState("")
+  const [kind, setKind] = useState("all")
+  const [statusFilter, setStatusFilter] = useState("all")
   const [name, setName] = useState("")
   const [projectId, setProjectId] = useState("")
   const [port, setPort] = useState("")
@@ -30,6 +33,11 @@ export function DomainsView() {
   if (!state) return <PageSkeleton />
   const selected = state.projects.find((project) => project.id === projectId) ?? state.projects[0]
 
+  const q = search.trim().toLowerCase()
+  const hostnames = state.domains.filter((domain) =>
+    (kind === "all" || domain.kind === kind)
+    && (statusFilter === "all" || (statusFilter === "active" ? domain.status === "active" : domain.status !== "active"))
+    && (!q || domain.name.toLowerCase().includes(q)))
   const active = state.domains.filter((domain) => domain.status === "active").length
   const waiting = state.domains.filter((domain) => domain.status !== "active").length
   const openAdd = () => { setProjectId(state.projects[0]?.id ?? ""); setPort(String(state.projects[0]?.exposedPort ?? "")); setOpen(true) }
@@ -70,51 +78,86 @@ export function DomainsView() {
         )}
       </section>
       <section>
-        <SectionHeading title="Hostnames" count={state.domains.length} aside={<Button variant="ghost" size="sm" onClick={openAdd}><Plus aria-hidden />Add</Button>} />
+        <SectionHeading title="Hostnames" count={hostnames.length} aside={<Button variant="ghost" size="sm" onClick={openAdd}><Plus aria-hidden />Add</Button>} />
+        <div className="page-toolbar mb-3">
+          <SearchField value={search} onChange={setSearch} placeholder="Find a domain" label="Search domains" />
+          <SelectInput aria-label="Kind" value={kind} onChange={(event) => setKind(event.target.value)}>
+            <option value="all">All kinds</option>
+            <option value="private">Private (.local)</option>
+            <option value="public">Public</option>
+          </SelectInput>
+          <SelectInput aria-label="Status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="attention">Needs action</option>
+          </SelectInput>
+        </div>
         {state.domains.length === 0 ? (
           <EmptyPanel icon={Globe2} title="No custom domains" body="Your applications can still be reached through their local endpoint." />
+        ) : hostnames.length === 0 ? (
+          <EmptyPanel icon={SearchX} title="No domains match" body="Try another name, kind, or status." />
         ) : (
-          <ItemList label="Hostnames">
-            {state.domains.map((domain) => {
+          <ul className="space-y-4">
+            {hostnames.map((domain) => {
               const project = state.projects.find((item) => item.id === domain.projectId)
+              const tone = domain.status === "active" ? "success" : domain.status === "invalid" ? "danger" : domain.status === "verifying" || domain.status === "issuing" ? "info" : "warning"
+              const steps = domain.kind === "public"
+                ? [
+                  { label: "DNS records", done: domain.status !== "dns-required" && domain.status !== "invalid" },
+                  { label: "Verified", done: domain.status === "active" || domain.status === "issuing" },
+                  { label: "Certificate", done: domain.ssl === "simulated-active" },
+                  { label: "Serving", done: domain.status === "active" },
+                ]
+                : [
+                  { label: "Name reserved", done: true },
+                  { label: "LAN resolver", done: domain.status === "active" },
+                  { label: "Serving", done: domain.status === "active" },
+                ]
               return (
-                <ItemRow
-                  key={domain.id}
-                  icon={domain.kind === "public" ? Globe2 : Network}
-                  tone={domain.status === "active" ? "success" : domain.status === "invalid" ? "danger" : domain.status === "verifying" || domain.status === "issuing" ? "info" : "warning"}
-                  title={domain.name}
-                  subtitle={`${project?.name ?? "Unassigned"} · port ${domain.targetPort} · added ${formatRelative(domain.createdAt, now)}`}
-                  meta={[<Tag key="k" tone={domain.kind === "public" ? "brand" : "neutral"}>{domain.kind === "private" ? "Private" : domain.kind === "public" ? "Public" : "Local"}</Tag>]}
-                  metaWidths={[80]}
-                  trailing={<DomainStatusView value={domain.status} />}
-                >
-                  <p className="flex items-center gap-2 text-xs text-muted">
-                    <Lock size={13} aria-hidden className="text-faint" />
-                    {domain.ssl === "simulated-active" ? "Simulated certificate. Phase 1 does not contact a certificate authority." : domain.ssl === "none" ? "No public certificate. This name is for the local network." : domain.ssl === "failed" ? "Certificate was not issued." : "Certificate has not been issued."}
-                  </p>
-                  {domain.error ? <p className="mt-2 text-xs text-[var(--status-danger)]">{domain.error}</p> : null}
-                  {domain.records.length ? (
-                    <ul className="dns-records">
-                      {domain.records.map((record) => (
-                        <li key={record.type + record.host}>
-                          <Tag tone="info">{record.type}</Tag>
-                          <span className="min-w-0 flex-1"><span className="block truncate font-mono text-[11.5px]">{record.host} → {record.value}</span><span className="block text-[11px] text-faint">{record.purpose}</span></span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                  <div className="mt-3 flex gap-2">
-                    {domain.kind === "public" && domain.status !== "active" ? (
-                      <Button variant="primary" size="sm" onClick={() => void deploy.verifyDomain(domain.id).then(() => toast({ title: domain.status === "invalid" ? "Verification restarted" : "Verification started", description: domain.name }))}>
-                        {domain.status === "invalid" ? "Verify again" : "Verify"}
-                      </Button>
-                    ) : null}
-                    <Button variant="danger" size="sm" onClick={() => setRemove(domain.id)}>Remove</Button>
+                <li key={domain.id} className="panel">
+                  <div className="item-row">
+                    <IconTile icon={domain.kind === "public" ? Globe2 : Network} tone={tone} size="lg" />
+                    <span className="item-main">
+                      <span className="item-title text-[15px]">{domain.name}</span>
+                      <span className="item-subtitle">{project?.name ?? "Unassigned"} · port {domain.targetPort} · added {formatRelative(domain.createdAt, now)}</span>
+                    </span>
+                    <span className="item-meta"><Tag tone={domain.kind === "public" ? "brand" : "neutral"}>{domain.kind === "private" ? "Private" : domain.kind === "public" ? "Public" : "Local"}</Tag></span>
+                    <span className="item-trailing"><DomainStatusView value={domain.status} /></span>
                   </div>
-                </ItemRow>
+                  <div className="border-t border-[var(--border-subtle)] px-[18px] py-5">
+                    <ol className="domain-steps" aria-label="Setup progress">
+                      {steps.map((step) => <li key={step.label} data-done={step.done}><span aria-hidden />{step.label}</li>)}
+                    </ol>
+                    <dl className="domain-facts">
+                      <div><dt>Routes to</dt><dd>{project?.name ?? "—"} <span className="text-faint">:{domain.targetPort}</span></dd></div>
+                      <div><dt>Certificate</dt><dd><Lock size={12} aria-hidden className="text-faint" />{domain.ssl === "simulated-active" ? "Simulated, active" : domain.ssl === "none" ? "Not needed on LAN" : domain.ssl === "failed" ? "Not issued" : "Pending"}</dd></div>
+                      <div><dt>Verified</dt><dd>{domain.verifiedAt ? formatRelative(domain.verifiedAt, now) : "Not yet"}</dd></div>
+                    </dl>
+                    {domain.error ? <p className="mt-3 text-xs text-[var(--status-danger)]">{domain.error}</p> : null}
+                    {domain.records.length ? (
+                      <ul className="dns-records">
+                        {domain.records.map((record) => (
+                          <li key={record.type + record.host}>
+                            <Tag tone="info">{record.type}</Tag>
+                            <span className="min-w-0 flex-1"><span className="block truncate font-mono text-[11.5px]">{record.host} → {record.value}</span><span className="block text-[11px] text-faint">{record.purpose}</span></span>
+                            <CopyButton value={record.value} label="Copy" />
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    <div className="mt-4 flex gap-2">
+                      {domain.kind === "public" && domain.status !== "active" ? (
+                        <Button variant="primary" size="sm" onClick={() => void deploy.verifyDomain(domain.id).then(() => toast({ title: domain.status === "invalid" ? "Verification restarted" : "Verification started", description: domain.name }))}>
+                          {domain.status === "invalid" ? "Verify again" : "Verify"}
+                        </Button>
+                      ) : null}
+                      <Button variant="danger" size="sm" onClick={() => setRemove(domain.id)}>Remove</Button>
+                    </div>
+                  </div>
+                </li>
               )
             })}
-          </ItemList>
+          </ul>
         )}
       </section>
       <Modal open={open} onOpenChange={setOpen} title="Add a domain" description="Enter a hostname, choose the project, and confirm the port it should reach.">

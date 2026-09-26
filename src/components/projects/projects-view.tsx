@@ -108,7 +108,7 @@ export function ProjectsView() {
           <option value="all">All statuses</option>
           {["ready", "building", "deploying", "preparing", "queued", "failed", "canceled", "stopped"].map((item) => (
             <option key={item} value={item}>
-              {item}
+              {item.charAt(0).toUpperCase() + item.slice(1)}
             </option>
           ))}
         </SelectInput>

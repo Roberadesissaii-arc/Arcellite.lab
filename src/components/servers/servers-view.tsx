@@ -1,17 +1,21 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowUpRight, Boxes, Cpu, Radio, Server } from "lucide-react"
+import { Activity, ArrowUpRight, Boxes, Cpu, Network, Radio, RefreshCw, Server, type LucideIcon } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { useToast } from "@/components/ui/toast"
 import { PageHeader } from "@/components/page-header"
 import { PageSkeleton } from "@/components/ui/bits"
 import { IconTile, SectionHeading, SegmentMeter, StatCard, StatGrid, Tag } from "@/components/ui/kit"
 import { ServerStatusView } from "@/components/ui/status"
-import { formatGb, formatPercent, formatUptime, plural } from "@/lib/deploy/format"
-import { useDeployState } from "@/lib/deploy/react"
+import { formatGb, formatPercent, formatRelative, formatUptime, plural } from "@/lib/deploy/format"
+import { useDeploy, useDeployState } from "@/lib/deploy/react"
 import { useNow } from "@/lib/use-now"
 
 export function ServersView() {
   const state = useDeployState()
+  const deploy = useDeploy()
+  const toast = useToast()
   const now = useNow()
   if (!state) return <PageSkeleton />
   const online = state.servers.filter((server) => server.status === "online").length
@@ -54,7 +58,42 @@ export function ServersView() {
                       <Resource label="Storage" value={`${formatGb(server.storageUsedGb)} / ${formatGb(server.storageTotalGb)}`} meter={(server.storageUsedGb / server.storageTotalGb) * 100} />
                     </dl>
                   )}
-                  <p className="mt-4 text-[11px] text-faint">Docker {server.dockerVersion} · Agent {server.agentVersion} · Up {formatUptime(server.startedAt, now)}</p>
+                </div>
+                <div className="server-details">
+                  <DetailBlock icon={Cpu} title="Hardware" rows={[
+                    ["CPU", `${server.cpuCount} cores · ${server.arch}`],
+                    ["Memory", `${formatGb(server.memoryTotalGb)} total`],
+                    ["Disk", `${formatGb(server.storageTotalGb)} total`],
+                    ["System", server.os],
+                  ]} />
+                  <DetailBlock icon={Network} title="Network" rows={[
+                    ["Address", <span key="a" className="font-mono">{server.ip}</span>],
+                    ["Interface", <span key="i" className="font-mono">{server.iface} · {server.cidr}</span>],
+                    ["Gateway", <span key="g" className="font-mono">{server.gateway}</span>],
+                    ["DNS", <span key="d" className="font-mono">{server.dns.join(", ")}</span>],
+                    ["Throughput", `${server.networkMbps} Mbps`],
+                  ]} />
+                  <DetailBlock icon={Activity} title="Runtime" rows={[
+                    ["Docker", <StatusText key="d" ok={server.dockerStatus === "running"} text={`${server.dockerVersion} · ${server.dockerStatus}`} />],
+                    ["Agent", <StatusText key="a" ok={server.agentStatus === "connected"} text={`${server.agentVersion} · ${server.agentStatus}`} />],
+                    ["Uptime", formatUptime(server.startedAt, now)],
+                    ["Last check", server.refreshedAt ? formatRelative(server.refreshedAt, now) : "Live stream"],
+                  ]} />
+                </div>
+                <div className="server-workloads">
+                  <p className="server-workloads-title">Workloads on this server <span className="section-count">{containers.length}</span></p>
+                  <div className="server-chips">
+                    {containers.map((container) => (
+                      <Link key={container.id} href={`/containers?inspect=${container.id}`} className="server-chip" data-state={container.state}>
+                        <span aria-hidden />{container.name}<small>{container.cpuPercent}% · {container.memoryMb} MB</small>
+                      </Link>
+                    ))}
+                  </div>
+                  <div className="server-actions">
+                    <Button variant="secondary" size="sm" onClick={() => void deploy.refreshServer(server.id).then(() => toast({ title: "Server refreshed", description: server.name }))}><RefreshCw aria-hidden />Refresh</Button>
+                    <Button variant="ghost" size="sm" onClick={() => void deploy.restartAgent(server.id).then(() => toast({ title: "Agent restart requested", description: server.name }))}>Restart agent</Button>
+                    <Link href={`/servers/${server.id}`} className="btn btn-ghost btn-sm ml-auto">Open server<ArrowUpRight aria-hidden /></Link>
+                  </div>
                 </div>
               </li>
             )
@@ -73,4 +112,19 @@ function Resource({ label, value, meter }: { label: string; value: string; meter
       <SegmentMeter value={meter} label={label} />
     </div>
   )
+}
+
+function DetailBlock({ icon, title, rows }: { icon: LucideIcon; title: string; rows: [string, React.ReactNode][] }) {
+  return (
+    <section className="server-detail">
+      <p className="server-detail-title"><IconTile icon={icon} tone="neutral" size="sm" />{title}</p>
+      <dl>
+        {rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+      </dl>
+    </section>
+  )
+}
+
+function StatusText({ ok, text }: { ok: boolean; text: string }) {
+  return <span className="inline-flex items-center gap-1.5"><span className="status-pip" data-ok={ok} aria-hidden />{text}</span>
 }
