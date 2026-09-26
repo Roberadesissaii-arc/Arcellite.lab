@@ -1,17 +1,16 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowRight, Boxes, Check, CircleAlert, Code2, Server, Zap, GitBranch, Globe2, ArrowUpRight, Plus } from "lucide-react"
+import { ArrowRight, Check, CircleAlert, Code2, Server, Zap, GitBranch, ArrowUpRight, Plus } from "lucide-react"
+import { DeploymentStatusView, ServerStatusView, Status } from "@/components/ui/status"
 import { BoxesIcon, EarthIcon, FolderKanbanIcon, GitBranchIcon, SparklesIcon } from "lucide-animated"
-import { DeploymentStatusView, ServerStatusView } from "@/components/ui/status"
+import { type AnimatedIcon, useIconAnimation } from "@/components/ui/animated-icon"
 import { PageSkeleton } from "@/components/ui/bits"
-import { useIconAnimation, type AnimatedIcon } from "@/components/ui/animated-icon"
 import { FRAMEWORKS } from "@/lib/deploy/detect"
 import { formatGb, formatRelative, greeting } from "@/lib/deploy/format"
 import { homeServer, latestDeployment, projectBadge, sourceText } from "@/lib/deploy/helpers"
 import { useDeployState } from "@/lib/deploy/react"
 import { useNow } from "@/lib/use-now"
-import type { ActivityEvent } from "@/lib/deploy/types"
 
 function SectionHeading({ title, href, action = "View all" }: { title: string; href: string; action?: string }) {
   return <div className="section-heading"><h2>{title}</h2><Link href={href}>{action}<ArrowRight aria-hidden /></Link></div>
@@ -23,7 +22,7 @@ export function OverviewView() {
   if (!state) return <PageSkeleton variant="overview" />
   const server = homeServer(state)
   const projects = [...state.projects].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
-  const activity = state.activity.slice(0, 3)
+  const activity = state.activity.slice(0, 5)
   const inFlight = state.deployments.filter((item) => !["ready", "failed", "canceled", "stopped"].includes(item.status))
   const failed = projects.filter((project) => projectBadge(project, latestDeployment(state.deployments, project.id, now)) === "failed")
   const waiting = state.domains.filter((domain) => domain.status === "dns-required" || domain.status === "invalid")
@@ -31,6 +30,11 @@ export function OverviewView() {
     ? "A deployment needs attention." : inFlight.length ? "A deployment is in progress." : "Infrastructure is healthy."
 
   const running = projects.filter(project => projectBadge(project, latestDeployment(state.deployments, project.id, now)) === "ready").length
+  const successes = state.activity.filter((event) => event.result === "success").length
+  const problems = state.activity.filter((event) => event.result === "warning" || event.result === "error").length
+  const readyReleases = state.deployments.filter((item) => item.status === "ready").length
+  const verified = state.domains.filter((domain) => domain.status === "active").length
+  const runningContainers = state.containers.filter((container) => container.state === "running").length
   const recent = [...state.deployments].sort((a,b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, 3)
 
   return (
@@ -45,7 +49,7 @@ export function OverviewView() {
         </div>
         <div className="intro-system" aria-label="Deployment workflow">
           <div className="system-caption"><span>YOUR DEPLOYMENT PIPELINE</span><span className="system-mode">Self-hosted</span></div>
-          <div className="pipeline"><div><span className="pipeline-icon"><GitBranch /></span><strong>Source</strong><small>GitHub or upload</small></div><span className="pipeline-line" /><div><span className="pipeline-icon"><Boxes /></span><strong>Build</strong><small>Detect & configure</small></div><span className="pipeline-line" /><div><span className="pipeline-icon pipeline-live"><Globe2 /></span><strong>Deploy</strong><small>Your infrastructure</small></div></div>
+          <div className="pipeline"><PipelineStep icon={GitBranchIcon} title="Source" detail="GitHub or upload" /><span className="pipeline-line" /><PipelineStep icon={BoxesIcon} title="Build" detail="Detect & configure" /><span className="pipeline-line" /><PipelineStep icon={EarthIcon} title="Deploy" detail="Your infrastructure" live /></div>
           <Link href={server ? `/servers/${server.id}` : '/servers'} className="intro-server"><span className="intro-server-icon"><Server size={17} /></span><span><strong>{server?.name ?? "Connect a server"}</strong><small>{server ? `${server.os} · ${server.ip}` : "A home for your applications"}</small></span>{server ? <ServerStatusView value={server.status} /> : <ArrowRight size={16} />}</Link>
         </div>
       </section>
@@ -80,7 +84,8 @@ export function OverviewView() {
         </div>
       </section>
 
-      <AskArcLink />
+      <AskArcCard />
+
       <section><SectionHeading title="Latest deployments" href="/deployments" /><div className="panel"><ul className="panel-list">{recent.map(deployment => <li key={deployment.id}><Link className="release-row" href={`/deployments/${deployment.id}`}><span className="release-icon"><GitBranch size={16} /></span><span className="min-w-0"><strong>{state.projects.find(p => p.id === deployment.projectId)?.name ?? 'Project'}</strong><small className="block truncate text-faint">{deployment.commitMessage || deployment.sourceLabel}</small></span><span className="release-branch">{deployment.branch ?? 'Direct upload'}</span><DeploymentStatusView value={deployment.status} /><time className="text-faint">{formatRelative(deployment.createdAt, now)}</time></Link></li>)}{!recent.length && <li className="p-5 text-muted">Your first deployment will appear here.</li>}</ul></div></section>
 
       <div className="overview-lower">
@@ -101,7 +106,27 @@ export function OverviewView() {
 
         <section>
           <SectionHeading title="Recent activity" href="/activity" />
-          <ActivitySummary events={state.activity} recent={activity} now={now} />
+          <div className="panel server-summary dashboard-summary-card activity-summary">
+            <div className="flex items-start justify-between gap-3">
+              <div><p className="text-sm font-semibold">Workspace activity</p><p className="mt-1 text-xs text-faint">{state.activity.length} events recorded · {state.settings.displayName}</p></div>
+              <Status tone={problems ? "warning" : "success"} icon={problems ? CircleAlert : Check} label={problems ? `${problems} to review` : "All clear"} />
+            </div>
+            <ul className="activity-mini">
+              {activity.slice(0, 3).map((event) => <li key={event.id}>
+                <span className="activity-mini-dot" data-result={event.result} aria-hidden />
+                <span className="min-w-0 flex-1 truncate">{event.href ? <Link href={event.href} className="font-medium hover:underline">{event.action}</Link> : <span className="font-medium">{event.action}</span>}<span className="text-faint"> · {event.objectName}</span></span>
+                <time dateTime={event.timestamp}>{formatRelative(event.timestamp, now)}</time>
+              </li>)}
+              {activity.length === 0 ? <li className="text-muted">Changes to this workspace will appear here.</li> : null}
+            </ul>
+            <hr className="hairline my-5" />
+            <dl className="server-resource-grid">
+              <Metric label="Successful changes" value={`${pct(successes, state.activity.length)}%`} meter={pct(successes, state.activity.length)} />
+              <Metric label="Releases ready" value={`${readyReleases} / ${state.deployments.length}`} meter={pct(readyReleases, state.deployments.length)} />
+              <Metric label="Domains verified" value={`${verified} / ${state.domains.length}`} meter={pct(verified, state.domains.length)} />
+              <Metric label="Containers running" value={`${runningContainers} / ${state.containers.length}`} meter={pct(runningContainers, state.containers.length)} />
+            </dl>
+          </div>
         </section>
       </div>
     </div>
@@ -113,43 +138,20 @@ function Metric({ label, value, meter }: { label: string; value: string; meter: 
 }
 
 function Stat({ href, icon: Icon, label, value, detail }: { href: string; icon: AnimatedIcon; label: string; value: number; detail: string }) {
-  const { ref, hostProps } = useIconAnimation()
-  return <Link href={href} className="overview-stat" {...hostProps}><span className="stat-label">{label}<Icon ref={ref} size={15} className="stat-animated-icon" /></span><strong>{value}<ArrowUpRight /></strong><small>{detail}</small></Link>
+  const { ref, bind } = useIconAnimation()
+  return <Link href={href} className="overview-stat" {...bind}><span className="stat-label">{label}<Icon ref={ref} size={16} className="animated-glyph" /></span><strong>{value}<ArrowUpRight /></strong><small>{detail}</small></Link>
 }
 
-function AskArcLink() {
-  const { ref, hostProps } = useIconAnimation()
-  return <Link href="/chat" className="overview-chat" {...hostProps}><span className="chat-spark"><SparklesIcon ref={ref} size={20} className="stat-animated-icon" /></span><span><strong>Ask Arc — a second pair of eyes on your projects.</strong><small>Ask what’s running, check a deployment, or find what needs attention.</small></span><span className="chat-open">Ask Arc<ArrowUpRight size={15} /></span></Link>
+function PipelineStep({ icon: Icon, title, detail, live }: { icon: AnimatedIcon; title: string; detail: string; live?: boolean }) {
+  const { ref, bind } = useIconAnimation()
+  return <div {...bind}><span className={live ? "pipeline-icon pipeline-live" : "pipeline-icon"}><Icon ref={ref} size={19} className="animated-glyph" /></span><strong>{title}</strong><small>{detail}</small></div>
 }
 
-function ActivitySummary({ events, recent, now }: { events: ActivityEvent[]; recent: ActivityEvent[]; now: number }) {
-  const succeeded = events.filter((event) => event.result === "success").length
-  const flagged = events.filter((event) => event.result === "warning" || event.result === "error").length
-  const other = events.length - succeeded - flagged
-  const latest = events[0]
-  const share = (count: number) => events.length ? Math.round(count / events.length * 20) : 0
-  const filledOk = share(succeeded)
-  const filledFlag = Math.min(20 - filledOk, share(flagged))
-  return <div className="panel activity-summary dashboard-summary-card">
-    <div className="flex items-start justify-between gap-3">
-      <div><Link href="/activity" className="text-sm font-semibold hover:underline">Workspace activity</Link><p className="mt-1 text-xs text-faint">{events.length} events recorded{latest ? ` · latest ${formatRelative(latest.timestamp, now)}` : ""}</p></div>
-      <span className="activity-state" data-tone={flagged ? "attention" : "ok"}>{flagged ? <CircleAlert aria-hidden /> : <Check aria-hidden />}{flagged ? `${flagged} to review` : "All clear"}</span>
-    </div>
-    <p className="mt-3 truncate font-mono text-xs text-muted">{latest ? `${latest.actor} · ${latest.action.toLowerCase()} · ${latest.objectName}` : "No changes yet"}</p>
-    <dl className="activity-counts">
-      <div><dt>Succeeded</dt><dd>{succeeded}</dd></div>
-      <div><dt>Needs review</dt><dd>{flagged}</dd></div>
-      <div><dt>Other</dt><dd>{other}</dd></div>
-    </dl>
-    <span className="resource-segments activity-segments" role="img" aria-label={`${succeeded} of ${events.length} events succeeded`}>{Array.from({ length: 20 }, (_, i) => <i key={i} data-filled={i < filledOk ? "ok" : i < filledOk + filledFlag ? "flag" : "none"} />)}</span>
-    <hr className="hairline my-5" />
-    <ul className="activity-mini">
-      {recent.map((event) => <li key={event.id} data-result={event.result}>
-        <span className="activity-mini-icon">{event.result === "success" ? <Check aria-hidden /> : <CircleAlert aria-hidden />}</span>
-        <span className="min-w-0 flex-1">{event.href ? <Link href={event.href} className="font-medium hover:underline">{event.action}</Link> : <span className="font-medium">{event.action}</span>}<small>{event.objectName}</small></span>
-        <time dateTime={event.timestamp}>{formatRelative(event.timestamp, now)}</time>
-      </li>)}
-      {recent.length === 0 ? <li className="text-sm text-muted">Changes to this workspace will appear here.</li> : null}
-    </ul>
-  </div>
+function AskArcCard() {
+  const { ref, bind } = useIconAnimation()
+  return <Link href="/chat" className="overview-chat" {...bind}><span className="chat-spark"><SparklesIcon ref={ref} size={25} className="animated-glyph" /></span><span><strong>Ask Arc — a second pair of eyes on your projects.</strong><small>Ask what’s running, check a deployment, or find what needs attention.</small></span><span className="chat-open">Ask Arc<ArrowUpRight size={15} /></span></Link>
+}
+
+function pct(part: number, total: number): number {
+  return total ? Math.round((part / total) * 100) : 0
 }
