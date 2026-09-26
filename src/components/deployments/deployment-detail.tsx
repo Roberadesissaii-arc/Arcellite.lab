@@ -31,7 +31,7 @@ export function DeploymentDetail() {
     if (stored) document.title = `Deployment ${stored.commitSha} · Arcellite Deploy`
   }, [stored])
 
-  if (!state) return <PageSkeleton />
+  if (!state) return <PageSkeleton variant="detail" />
   if (!stored) {
     return (
       <div className="page">

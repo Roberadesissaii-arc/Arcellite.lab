@@ -27,7 +27,7 @@ export function EventsView() {
         <SectionHeading title="Timeline" count={state.activity.length} />
         {state.activity.length === 0 ? (
           <EmptyPanel icon={GalleryVerticalEnd} title="No events" body="Deploys, restarts, and domain checks are recorded here." />
-        ) : <ActivityTimeline events={state.activity} now={now} />}
+        ) : <ActivityTimeline events={state.activity} now={now} pageSize={6} />}
       </section>
     </div>
   )

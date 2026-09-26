@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { Bell, Download, FolderGit2, Info, Lock, Palette, RefreshCw, Rocket, Server, Settings, SlidersHorizontal, Wrench, type LucideIcon } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
@@ -20,7 +21,7 @@ const SECTIONS = ["General", "Appearance", "Notifications", "Git providers", "De
 type Section = (typeof SECTIONS)[number]
 
 const SECTION_META: Record<Section, { icon: LucideIcon; blurb: string }> = {
-  General: { icon: SlidersHorizontal, blurb: "Workspace identity, your profile, and where data lives." },
+  General: { icon: SlidersHorizontal, blurb: "Workspace identity and where data lives." },
   Appearance: { icon: Palette, blurb: "Shell appearance and how much the interface moves." },
   Notifications: { icon: Bell, blurb: "Which changes show up in your notification feed." },
   "Git providers": { icon: FolderGit2, blurb: "Repositories Arcellite can import and redeploy from." },
@@ -64,10 +65,15 @@ export function SettingsView() {
   const deploy = useDeploy()
   const toast = useToast()
   const now = useNow(15000)
-  const [section, setSection] = useState<Section>("General")
+  const params = useSearchParams()
+  const requested = params.get("section")
+  // A click picks a tab; a new ?section= link (e.g. from the profile menu) wins over an older click.
+  const [choice, setChoice] = useState<{ from: string | null; section: Section } | null>(null)
+  const section: Section = choice && choice.from === requested ? choice.section : SECTIONS.find((item) => item === requested) ?? "General"
+  const setSection = (next: Section) => setChoice({ from: requested, section: next })
   const [disconnect, setDisconnect] = useState(false)
   const [reset, setReset] = useState(false)
-  if (!state) return <PageSkeleton />
+  if (!state) return <PageSkeleton variant="detail" />
   const settings = state.settings
   const set = (patch: Partial<SettingsShape>, title = "Setting saved") => void deploy.updateSettings(patch).then(() => toast({ title }))
   const secrets = state.projects.reduce((sum, project) => sum + project.env.filter((item) => item.secret).length, 0)
@@ -99,13 +105,12 @@ export function SettingsView() {
                 const data = new FormData(event.currentTarget)
                 set({
                   workspaceName: String(data.get("workspace") || settings.workspaceName),
-                  displayName: String(data.get("name") || settings.displayName),
                   timezone: String(data.get("timezone") || settings.timezone),
                 }, "General settings saved")
               }}>
                 <Group title="Workspace" footer={<Button type="submit" variant="primary" size="sm">Save changes</Button>}>
                   <Row label="Workspace name" hint="Shown in the sidebar and the overview greeting."><TextInput name="workspace" defaultValue={settings.workspaceName} /></Row>
-                  <Row label="Display name" hint="How you appear in activity and audit entries."><TextInput name="name" defaultValue={settings.displayName} /></Row>
+                  <Row label="Your profile" hint="Your name and avatar are edited on your profile page."><Link href="/profile" className="setting-value hover:text-[var(--brand-primary)]">{settings.displayName} · Edit profile →</Link></Row>
                   <Row label="Time zone" hint="Saved with your profile. Timestamps currently follow this browser's clock.">
                     <SelectInput name="timezone" defaultValue={settings.timezone}>{TIMEZONES.map((zone) => <option key={zone} value={zone}>{zone.replace("_", " ")}</option>)}</SelectInput>
                   </Row>

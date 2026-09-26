@@ -30,7 +30,7 @@ export function ContainersView() {
   const inspect = picked === undefined ? params.get("inspect") : picked
   const [confirm, setConfirm] = useState<{ id: string; action: "stop" | "restart" } | null>(null)
 
-  if (!state) return <PageSkeleton />
+  if (!state) return <PageSkeleton variant="table" />
   const q = search.trim().toLowerCase()
   const rows = state.containers.filter((container) => {
     const project = state.projects.find((item) => item.id === container.projectId)

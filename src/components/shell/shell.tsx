@@ -121,12 +121,13 @@ function crumbLabel(pathname: string): string {
     "/activity": "Activity",
     "/logs": "Logs",
     "/metrics": "Metrics",
-    "/jobs": "Jobs",
+    "/pipelines": "Pipelines",
     "/events": "Events",
     "/alerts": "Alerts",
     "/docs": "Docs",
     "/notifications": "Notifications",
     "/settings": "Settings",
+    "/profile": "Profile",
   }
   if (map[pathname]) return map[pathname]
   if (pathname.startsWith("/projects/")) return "Project"

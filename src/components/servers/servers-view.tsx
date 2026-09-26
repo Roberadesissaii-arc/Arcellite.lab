@@ -17,7 +17,7 @@ export function ServersView() {
   const deploy = useDeploy()
   const toast = useToast()
   const now = useNow()
-  if (!state) return <PageSkeleton />
+  if (!state) return <PageSkeleton variant="cards" />
   const online = state.servers.filter((server) => server.status === "online").length
   const reporting = state.servers.filter((server) => server.status !== "offline")
   const avgCpu = reporting.length ? reporting.reduce((sum, server) => sum + server.cpuPercent, 0) / reporting.length : 0

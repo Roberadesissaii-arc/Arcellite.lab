@@ -10,10 +10,10 @@ import { formatDuration, formatRelative } from "@/lib/deploy/format"
 import { useDeployState } from "@/lib/deploy/react"
 import { useNow } from "@/lib/use-now"
 
-export function JobsView() {
+export function PipelinesView() {
   const state = useDeployState()
   const now = useNow(1000)
-  if (!state) return <PageSkeleton />
+  if (!state) return <PageSkeleton variant="table" />
   const jobs = [...state.deployments]
     .map((deployment) => materializeDeployment(deployment, now))
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
@@ -24,19 +24,19 @@ export function JobsView() {
   const avg = finished.length ? finished.reduce((sum, job) => sum + (Date.parse(job.finishedAt!) - Date.parse(job.createdAt)), 0) / finished.length : 0
   return (
     <div className="page page-stack">
-      <PageHeader icon={Workflow} kicker="Observe" title="Jobs" description="Build and deploy work on this server — each deployment runs as one job through the pipeline." />
+      <PageHeader icon={Workflow} kicker="Observe" title="Pipelines" description="Every deployment runs through the build pipeline: prepare, install, build, image, start, and health check." />
       <StatGrid>
         <StatCard icon={Loader} tone="brand" label="Active" value={active.length} detail={active.length ? "Running now" : "Queue is empty"} />
         <StatCard icon={CircleCheck} tone="success" label="Succeeded" value={done} detail="Completed every step" />
         <StatCard icon={CircleAlert} tone={failed ? "danger" : "neutral"} label="Failed" value={failed} detail={failed ? "Check the build log" : "No failures"} />
-        <StatCard icon={Hammer} tone="info" label="Average build" value={avg ? formatDuration(avg) : "—"} detail="Successful jobs" />
+        <StatCard icon={Hammer} tone="info" label="Average build" value={avg ? formatDuration(avg) : "—"} detail="Successful runs" />
       </StatGrid>
       <section>
-        <SectionHeading title="Job history" count={jobs.length} />
+        <SectionHeading title="Pipeline runs" count={jobs.length} />
         {jobs.length === 0 ? (
-          <EmptyPanel icon={Workflow} title="No jobs" body="A deployment starts a job." />
+          <EmptyPanel icon={Workflow} title="No pipeline runs" body="Each deployment starts a pipeline run." />
         ) : (
-          <ItemList label="Jobs">
+          <ItemList label="Pipeline runs">
             {jobs.map((job) => {
               const project = state.projects.find((item) => item.id === job.projectId)
               const completed = job.steps.filter((step) => step.status === "completed").length

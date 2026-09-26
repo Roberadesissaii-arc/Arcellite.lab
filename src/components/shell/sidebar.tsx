@@ -1,7 +1,7 @@
 "use client"
 
 import * as Tooltip from "@radix-ui/react-tooltip"
-import { ChevronLeft, ChevronRight, ChevronsUpDown, Server, Minus, Code2, HelpCircle, LogOut, UserCog } from "lucide-react"
+import { ChevronLeft, ChevronRight, ChevronsUpDown, CircleUser, Server, Minus, Code2, HelpCircle, LogOut, Settings as SettingsIcon } from "lucide-react"
 import { NAV_GROUPS, DOCS_ITEM, SETTINGS_ITEM, NOTIFICATIONS_ITEM, isNavActive, type AnimatedIconHandle, type NavItem } from "@/components/nav"
 import { useReducedMotion } from "motion/react"
 import Link from "next/link"
@@ -86,12 +86,13 @@ export function SidebarNav({
   const state = useDeployState()
   const name = state?.settings.displayName ?? "Robera"
   const workspace = state?.settings.workspaceName ?? "Arcellite Lab"
-  const counts: Record<string, number> = {
-    "/containers": state?.containers.length ?? 0,
-    "/domains": state?.domains.length ?? 0,
-    "/storage": state?.volumes.length ?? 0,
-    "/databases": state?.databases.length ?? 0,
-  }
+  // No counters until the workspace has loaded, so they never flash "0".
+  const counts: Record<string, number> = state ? {
+    "/containers": state.containers.length,
+    "/domains": state.domains.length,
+    "/storage": state.volumes.length,
+    "/databases": state.databases.length,
+  } : {}
 
   return (
     <>
@@ -174,14 +175,17 @@ export function SidebarNav({
             <p className="mt-0.5 truncate text-[11px] text-zinc-500">{workspace}</p>
           </div>
           <MenuSeparator />
+          <MenuItem onSelect={() => router.push("/profile")}>
+            <CircleUser className="h-3.5 w-3.5" /> Profile
+          </MenuItem>
+          <MenuItem onSelect={() => router.push("/settings")}>
+            <SettingsIcon className="h-3.5 w-3.5" /> Workspace settings
+          </MenuItem>
+          <MenuItem onSelect={() => router.push("/settings?section=Advanced")}>
+            <Code2 className="h-3.5 w-3.5" /> Developer tools
+          </MenuItem>
           <MenuItem onSelect={() => router.push("/docs")}>
-            <HelpCircle className="h-3.5 w-3.5" /> Support
-          </MenuItem>
-          <MenuItem onSelect={() => router.push("/settings")}>
-            <Code2 className="h-3.5 w-3.5" /> Developer
-          </MenuItem>
-          <MenuItem onSelect={() => router.push("/settings")}>
-            <UserCog className="h-3.5 w-3.5" /> Edit Profile
+            <HelpCircle className="h-3.5 w-3.5" /> Help & docs
           </MenuItem>
           <MenuSeparator />
           <MenuItem

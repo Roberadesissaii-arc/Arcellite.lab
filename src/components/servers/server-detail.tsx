@@ -26,7 +26,7 @@ export function ServerDetail() {
   const [tab, setTab] = useState<(typeof TABS)[number]>("Overview")
   const [confirm, setConfirm] = useState<"restart" | "disconnect" | null>(null)
   const server = state?.servers.find((item) => item.id === params.serverId)
-  if (!state) return <PageSkeleton />
+  if (!state) return <PageSkeleton variant="detail" />
   if (!server) {
     return <div className="page"><h1 className="page-title">Server not found</h1></div>
   }

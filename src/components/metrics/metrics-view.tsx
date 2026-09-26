@@ -35,7 +35,7 @@ export function MetricsView() {
   const now = useNow()
   const [serverId, setServerId] = useState(state?.servers[0]?.id ?? "")
   const [hours, setHours] = useState<(typeof RANGES)[number]["hours"]>(24)
-  if (!state) return <PageSkeleton />
+  if (!state) return <PageSkeleton variant="cards" />
   const server = state.servers.find((item) => item.id === (serverId || state.servers[0]?.id)) ?? state.servers[0]
   if (!server) return <div className="page"><EmptyPanel icon={Gauge} title="No server to measure" body="Connect a server to see telemetry." /></div>
   const metrics = serverMetrics(server, state)

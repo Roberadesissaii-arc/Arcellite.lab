@@ -78,7 +78,7 @@ export function ProjectsView() {
     )
   }, [toast])
 
-  if (!state) return <PageSkeleton />
+  if (!state) return <PageSkeleton variant="table" />
 
   return (
     <div className="page page-wide page-stack">
