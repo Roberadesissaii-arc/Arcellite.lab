@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useState } from "react"
 import { PageHeader } from "@/components/page-header"
 import { PageSkeleton } from "@/components/ui/bits"
@@ -92,6 +93,15 @@ export function StorageView() {
                 </button>
               )
             })}
+            {server ? (
+              <div className="card grid-slot storage-slot" data-rem3={(3 - (rows.length % 3)) % 3} data-rem2={rows.length % 2}>
+                <IconTile icon={HardDrive} tone="brand" size="lg" />
+                <strong>{formatGb(server.storageTotalGb - server.storageUsedGb)} free on {server.name}</strong>
+                <small>New volumes are created when you add a database or cache to a project.</small>
+                <SegmentMeter value={diskPct} label="Server disk used" />
+                <span className="storage-slot-foot"><span>{diskPct.toFixed(0)}% used</span><Link href="/databases" className="text-[var(--brand-primary)] font-semibold">Add a database →</Link></span>
+              </div>
+            ) : null}
           </div>
         )}
       </section>

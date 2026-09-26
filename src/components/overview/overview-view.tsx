@@ -73,7 +73,7 @@ export function OverviewView() {
         <SectionHeading title="Projects" href="/projects" />
         <div className="panel">
           {projects.length === 0 ? <div className="p-6"><p className="font-medium">No projects yet</p><Link href="/projects/new" className="mt-3 inline-block text-brand">Deploy your first application →</Link></div> :
-            <ul className="panel-list">{projects.map((project) => {
+            <ul className="panel-list overview-project-list">{projects.slice(0, 4).map((project) => {
               const latest = latestDeployment(state.deployments, project.id, now)
               return <li key={project.id}><Link href={`/projects/${project.id}`} className="overview-project">
                 <span className="project-identity"><span className="framework-mark">{project.framework === "fastapi" ? <Zap aria-hidden /> : <Code2 aria-hidden />}</span><span className="min-w-0"><strong>{project.name}</strong><small>{sourceText(project)}</small></span></span>
@@ -82,7 +82,17 @@ export function OverviewView() {
                 <DeploymentStatusView value={projectBadge(project, latest)} />
                 <time className="text-faint tabular-nums" dateTime={project.updatedAt}>{formatRelative(project.updatedAt, now)}</time>
               </Link></li>
-            })}</ul>}
+            })}
+            {projects.length < 4 ? (
+              <li className="overview-project-slot" style={{ flexGrow: 4 - projects.length }}>
+                <Link href="/projects/new">
+                  <span className="overview-project-slot-icon"><Plus aria-hidden /></span>
+                  <span className="min-w-0"><strong>Room for {4 - projects.length === 1 ? "another project" : `${4 - projects.length} more projects`}</strong><small>Deploy from GitHub, an upload, or a container image.</small></span>
+                  <span className="overview-project-slot-cta">New project<ArrowUpRight aria-hidden /></span>
+                </Link>
+              </li>
+            ) : null}
+            </ul>}
         </div>
         </section>
         <section className="min-w-0">

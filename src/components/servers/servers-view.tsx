@@ -1,13 +1,13 @@
 "use client"
 
 import Link from "next/link"
-import { Activity, ArrowUpRight, Boxes, Cable, Clock, Container, Cpu, Gauge, Globe2, HardDrive, History, Layers, MapPin, MemoryStick, Monitor, Network, Plug, Radio, RefreshCw, Router, Server, type LucideIcon } from "lucide-react"
+import { Activity, ArrowUpRight, Box, Boxes, Cable, Cog, Database, FolderKanban, GitBranch, Rocket, Clock, Container, Cpu, Gauge, Globe2, HardDrive, History, Layers, MapPin, MemoryStick, Monitor, Network, Plug, Plus, Radio, RefreshCw, Router, Server, type LucideIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/toast"
 import { PageHeader } from "@/components/page-header"
 import { PageSkeleton } from "@/components/ui/bits"
-import { IconTile, SectionHeading, SegmentMeter, StatCard, StatGrid, Tag, type Tone } from "@/components/ui/kit"
-import { ServerStatusView } from "@/components/ui/status"
+import { EmptyPanel, IconTile, SectionHeading, SegmentMeter, StatCard, StatGrid, Tag, type Tone } from "@/components/ui/kit"
+import { ContainerStatusView, ServerStatusView } from "@/components/ui/status"
 import { formatGb, formatPercent, formatRelative, formatUptime, plural } from "@/lib/deploy/format"
 import { useDeploy, useDeployState } from "@/lib/deploy/react"
 import { useNow } from "@/lib/use-now"
@@ -98,8 +98,8 @@ export function ServersView() {
                     <ul className="server-events">
                       {events.map((event) => (
                         <li key={event.id}>
-                          <span className="activity-mini-dot" data-result={event.result} aria-hidden />
-                          <span className="min-w-0 flex-1 truncate"><strong>{event.action}</strong> · {event.objectName}</span>
+                          <IconTile icon={EVENT_ICON[event.objectType] ?? History} tone={event.result === "error" ? "danger" : event.result === "warning" ? "warning" : "brand"} size="sm" />
+                          <span className="min-w-0 flex-1"><strong className="block truncate">{event.action}</strong><small className="block truncate">{event.objectType} · {event.objectName}</small></span>
                           <time dateTime={event.timestamp}>{formatRelative(event.timestamp, now)}</time>
                         </li>
                       ))}
@@ -107,29 +107,71 @@ export function ServersView() {
                     </ul>
                   </section>
                 </div>
-                <div className="server-workloads">
-                  <p className="server-workloads-title">Workloads on this server <span className="section-count">{containers.length}</span></p>
-                  <div className="server-chips">
-                    {containers.map((container) => (
-                      <Link key={container.id} href={`/containers?inspect=${container.id}`} className="server-chip" data-state={container.state}>
-                        <span aria-hidden />{container.name}<small>{container.cpuPercent}% · {container.memoryMb} MB</small>
-                      </Link>
-                    ))}
-                  </div>
-                  <div className="server-actions">
-                    <Button variant="secondary" size="sm" onClick={() => void deploy.refreshServer(server.id).then(() => toast({ title: "Server refreshed", description: server.name }))}><RefreshCw aria-hidden />Refresh</Button>
-                    <Button variant="ghost" size="sm" onClick={() => void deploy.restartAgent(server.id).then(() => toast({ title: "Agent restart requested", description: server.name }))}>Restart agent</Button>
-                    <Link href={`/servers/${server.id}`} className="btn btn-ghost btn-sm ml-auto">Open server<ArrowUpRight aria-hidden /></Link>
-                  </div>
+                <div className="server-actions">
+                  <Button variant="secondary" size="sm" onClick={() => void deploy.refreshServer(server.id).then(() => toast({ title: "Server refreshed", description: server.name }))}><RefreshCw aria-hidden />Refresh</Button>
+                  <Button variant="ghost" size="sm" onClick={() => void deploy.restartAgent(server.id).then(() => toast({ title: "Agent restart requested", description: server.name }))}>Restart agent</Button>
+                  <Link href={`/servers/${server.id}`} className="btn btn-ghost btn-sm ml-auto">Open server<ArrowUpRight aria-hidden /></Link>
                 </div>
               </li>
             )
           })}
         </ul>
       </section>
+      {state.servers.map((server) => {
+        const containers = state.containers.filter((item) => item.serverId === server.id)
+        return (
+          <section key={server.id}>
+            <SectionHeading title={state.servers.length > 1 ? `Workloads on ${server.name}` : "Workloads on this server"} count={containers.length} href="/containers" action="All containers" />
+            {containers.length === 0 ? (
+              <EmptyPanel icon={Boxes} title="Nothing running here yet" body="Deploy a project and its containers will show up on this server." />
+            ) : (
+              <ul className="workload-grid">
+                {containers.map((container) => {
+                  const project = state.projects.find((item) => item.id === container.projectId)
+                  const published = container.ports.filter((port) => port.host)
+                  return (
+                    <li key={container.id}>
+                      <Link href={`/containers?inspect=${container.id}`} className="workload-card" data-state={container.state}>
+                        <span className="workload-head">
+                          <IconTile icon={ROLE_ICON[container.role]} tone={container.state === "running" ? "brand" : container.state === "stopped" || container.state === "exited" ? "danger" : "info"} />
+                          <span className="min-w-0 flex-1">
+                            <strong>{container.name}</strong>
+                            <small>{project?.name ?? "Standalone"} · {container.role}</small>
+                          </span>
+                          <ContainerStatusView value={container.state} />
+                        </span>
+                        <code className="workload-image">{container.image}</code>
+                        <span className="workload-meters">
+                          <span><small>CPU</small><b>{container.cpuPercent}%</b><SegmentMeter value={container.cpuPercent * 4} label="CPU" /></span>
+                          <span><small>Memory</small><b>{container.memoryMb} MB</b><SegmentMeter value={(container.memoryMb / 1024) * 100} label="Memory" /></span>
+                        </span>
+                        <span className="workload-foot">
+                          <Plug aria-hidden />{published.length ? published.map((port) => `:${port.host}`).join(" ") : "Internal only"}
+                          <ArrowUpRight aria-hidden className="ml-auto" />
+                        </span>
+                      </Link>
+                    </li>
+                  )
+                })}
+                <li className="workload-slot" data-rem3={(3 - (containers.length % 3)) % 3} data-rem2={containers.length % 2}>
+                  <Link href="/projects/new" className="workload-card workload-card-slot">
+                    <span className="overview-project-slot-icon"><Plus aria-hidden /></span>
+                    <strong>Room for more</strong>
+                    <small>{formatGb(server.memoryTotalGb - server.memoryUsedGb)} memory and {formatGb(server.storageTotalGb - server.storageUsedGb)} disk free on {server.name}.</small>
+                    <span className="overview-project-slot-cta">Deploy a project<ArrowUpRight aria-hidden /></span>
+                  </Link>
+                </li>
+              </ul>
+            )}
+          </section>
+        )
+      })}
     </div>
   )
 }
+
+const ROLE_ICON: Record<string, LucideIcon> = { web: Globe2, worker: Cog, data: Database }
+const EVENT_ICON: Record<string, LucideIcon> = { Deployment: Rocket, Container: Box, Server: Server, Domain: Globe2, Project: FolderKanban, "Git provider": GitBranch }
 
 function Resource({ label, value, meter }: { label: string; value: string; meter: number }) {
   return (

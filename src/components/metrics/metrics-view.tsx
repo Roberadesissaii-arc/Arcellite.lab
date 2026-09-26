@@ -121,7 +121,7 @@ export function MetricsView() {
               </div>
             </section>
 
-            <div className="flex min-w-0 flex-col gap-6">
+            <div className="metrics-side flex min-w-0 flex-col gap-6">
               <section>
                 <SectionHeading title="Headroom" />
                 <div className="card">

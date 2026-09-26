@@ -1,6 +1,6 @@
 "use client"
 
-import { X } from "lucide-react"
+import { AlertTriangle, CircleHelp, X, type LucideIcon } from "lucide-react"
 import * as Dialog from "@radix-ui/react-dialog"
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
@@ -15,6 +15,8 @@ export function Modal({
   description,
   children,
   wide = false,
+  icon: Icon,
+  tone = "brand",
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -22,6 +24,8 @@ export function Modal({
   description?: string
   children: React.ReactNode
   wide?: boolean
+  icon?: LucideIcon
+  tone?: "brand" | "danger" | "warning" | "success" | "info"
 }) {
   const reduced = useReducedMotion()
   return (
@@ -38,25 +42,42 @@ export function Modal({
                 transition={reduced ? { duration: 0.12 } : springFast}
               />
             </Dialog.Overlay>
-            <Dialog.Content asChild forceMount aria-describedby={description ? undefined : undefined}>
-              <motion.div
-                className="workspace-surface material fixed left-1/2 top-[10vh] z-50 max-h-[80vh] overflow-auto rounded-[var(--radius-sheet)] border border-[var(--border-subtle)] p-6 shadow-[var(--shadow-overlay)]"
-                style={{ width: wide ? "min(720px, calc(100% - 32px))" : "min(480px, calc(100% - 32px))" }}
-                initial={reduced ? { opacity: 0, x: "-50%" } : { opacity: 0, x: "-50%", y: 12, scale: 0.98 }}
-                animate={{ opacity: 1, x: "-50%", y: 0, scale: 1 }}
-                exit={reduced ? { opacity: 0, x: "-50%" } : { opacity: 0, x: "-50%", y: 8, scale: 0.98 }}
-                transition={reduced ? { duration: 0.12 } : springSheet}
+            {/* Centred over the workspace, not the viewport, so the sidebar never offsets it. */}
+            <div className="dialog-frame">
+              <Dialog.Content
+                asChild
+                forceMount
+                onOpenAutoFocus={(event) => {
+                  // Keep focus on the dialog (or a field that asked for it) rather than ringing the close button.
+                  event.preventDefault()
+                  const node = event.currentTarget as HTMLElement | null
+                  if (node && !node.contains(document.activeElement)) node.focus()
+                }}
               >
-                <Dialog.Close className="icon-btn pressable absolute right-3 top-3" aria-label="Close dialog"><X aria-hidden /></Dialog.Close>
-                <Dialog.Title className="font-display pr-6 text-[1.35rem] leading-tight">{title}</Dialog.Title>
-                {description ? (
-                  <Dialog.Description className="mt-2 text-sm text-muted">{description}</Dialog.Description>
-                ) : (
-                  <Dialog.Description className="sr-only">Dialog</Dialog.Description>
-                )}
-                <div className="mt-5">{children}</div>
-              </motion.div>
-            </Dialog.Content>
+                <motion.div
+                  className="dialog workspace-surface"
+                  data-wide={wide || undefined}
+                  initial={reduced ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={reduced ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.98 }}
+                  transition={reduced ? { duration: 0.12 } : springSheet}
+                >
+                  <header className="dialog-head">
+                    {Icon ? <span className="dialog-icon" data-tone={tone}><Icon aria-hidden /></span> : null}
+                    <div className="min-w-0 flex-1">
+                      <Dialog.Title className="dialog-title">{title}</Dialog.Title>
+                      {description ? (
+                        <Dialog.Description className="dialog-description">{description}</Dialog.Description>
+                      ) : (
+                        <Dialog.Description className="sr-only">Dialog</Dialog.Description>
+                      )}
+                    </div>
+                    <Dialog.Close className="icon-btn pressable dialog-close" aria-label="Close dialog"><X aria-hidden /></Dialog.Close>
+                  </header>
+                  <div className="dialog-body">{children}</div>
+                </motion.div>
+              </Dialog.Content>
+            </div>
           </Dialog.Portal>
         ) : null}
       </AnimatePresence>
@@ -84,8 +105,8 @@ export function ConfirmDialog({
   onOpenChange: (open: boolean) => void
 }) {
   return (
-    <Modal open={open} onOpenChange={onOpenChange} title={title} description={body}>
-      <div className="flex justify-end gap-2">
+    <Modal open={open} onOpenChange={onOpenChange} title={title} description={body} icon={danger ? AlertTriangle : CircleHelp} tone={danger ? "danger" : "brand"}>
+      <div className="dialog-actions">
         <Button variant="ghost" onClick={() => onOpenChange(false)}>
           Cancel
         </Button>
