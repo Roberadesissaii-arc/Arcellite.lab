@@ -553,7 +553,7 @@ html[data-motion="reduce"] .popover-content { animation: none; }
 .resource-button:hover { background: #fafafa; }
 .resource-button:active { background: var(--surface-sunken); }
 .resource-button { transition: background-color 120ms; }
-.new-project-page { max-width: 900px; }
+
 .source-choices { display: grid; gap: 12px; }
 .source-choice { align-items: flex-start; border: 1px solid var(--border-subtle); background: var(--surface-raised); padding: 22px; }
 .source-choice:hover { border-color: var(--border-strong); background: #fafafa; }
@@ -638,3 +638,4 @@ html[data-motion="reduce"] .sidebar-profile:active, html[data-motion="reduce"] .
 @container (max-width:760px) { .filter-toolbar { grid-template-columns:repeat(3,minmax(0,1fr)); }.filter-toolbar > :first-child { grid-column:1/-1; }.project-table-row { grid-template-columns:minmax(0,1fr) 90px 32px; }.project-table-row .project-environment,.project-table-row .project-updated { display:none; }.deployment-table-row { grid-template-columns:85px minmax(0,1fr) 100px; }.deployment-table-row .deployment-source { display:none; }.page-introduction { padding:22px; }.overview-lower { grid-template-columns:1fr; } }
 @container (max-width:500px) { .filter-toolbar { grid-template-columns:1fr; }.filter-toolbar > :first-child { grid-column:auto; }.project-table-row:not(.list-columns) { grid-template-columns:minmax(0,1fr) 32px; gap:8px; padding:16px; }.project-table-row .project-name { grid-column:1; grid-row:1; }.project-table-row .project-status { grid-column:1; grid-row:2; }.project-table-row .project-actions { grid-column:2; grid-row:1/3; }.project-list .list-columns,.deployment-list .list-columns { display:none; }.deployment-table-row:not(.list-columns) { grid-template-columns:minmax(0,1fr) auto; gap:12px; padding:16px; }.deployment-table-row .deployment-name { grid-column:1/-1; grid-row:1; }.deployment-table-row .deployment-status { grid-column:1; grid-row:2; }.deployment-table-row .deployment-time { grid-column:2; grid-row:2; text-align:right; }.server-resource-grid { gap:20px 16px; }.resource-stat dd { font-size:14px; } }
 }
+

@@ -51,11 +51,12 @@ function SidebarTooltip({ label, enabled, children }: { label: string; enabled: 
 function FlatLink({ label, icon: Icon, href, count, collapsed, pathname, onNavigate, nested }: NavItem & {
   nested?: boolean; count?: number; collapsed: boolean; pathname: string; onNavigate?: () => void
 }) {
+  const showIcon = !nested || collapsed
   return <SidebarTooltip label={label} enabled={collapsed}>
     <Link href={href} onClick={onNavigate} aria-label={label}
       aria-current={isNavActive(pathname, href) ? "page" : undefined}
       className="sidebar-link" data-nested={nested} data-collapsed={collapsed}>
-      {(!nested || collapsed) && <Icon aria-hidden />}
+      {showIcon && <Icon aria-hidden />}
       {!collapsed && <><span className="min-w-0 flex-1 truncate">{label}</span>
         {count !== undefined && <span className="sidebar-count">{count}</span>}</>}
     </Link>

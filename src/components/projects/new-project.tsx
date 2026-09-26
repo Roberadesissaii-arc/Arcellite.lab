@@ -4,9 +4,9 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useForm, useWatch } from "react-hook-form"
 import { z } from "zod"
-import { ArrowRight, Check, Container, GitBranch, Globe2, Hammer, Layers, Rocket, ScanSearch, Server as ServerIcon, SlidersHorizontal, Upload } from "lucide-react"
-import { ServerStatusView } from "@/components/ui/status"
-import { IconTile, SectionHeading, SegmentMeter, Tag } from "@/components/ui/kit"
+import Link from "next/link"
+import { ArrowRight, Check, Container, GitBranch, Layers, Rocket, Server, Upload } from "lucide-react"
+import { IconTile, SectionHeading, Tag } from "@/components/ui/kit"
 import { GitHubMark } from "@/components/brand"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
@@ -24,6 +24,7 @@ import {
   FRAMEWORK_ORDER,
 } from "@/lib/deploy/detect"
 import { formatBytes, formatGb } from "@/lib/deploy/format"
+import { ServerStatusView } from "@/components/ui/status"
 import { homeServer, nextFreePort, portTaken } from "@/lib/deploy/helpers"
 import { useDeploy, useDeployState } from "@/lib/deploy/react"
 import { useReducedMotion } from "motion/react"
@@ -247,11 +248,10 @@ export function NewProjectView() {
     }
   }
 
-  const target = homeServer(state)
   const imported = repo?.importedProjectId ? state.projects.find((project) => project.id === repo.importedProjectId) : null
 
   return (
-    <div className={stage === "choose" ? "page new-project-page np-wide" : "page new-project-page"}>
+    <div className="page new-project-page">
       <ol className="np-steps" aria-label="Progress">
         {STEPS.map((step, index) => {
           const current = STEPS.findIndex((item) => item.stages.includes(stage))
@@ -263,6 +263,8 @@ export function NewProjectView() {
           )
         })}
       </ol>
+      <div className="np-layout">
+      <div className="np-main">
       {stage === "choose" ? (
         <>
           <PageHeader icon={Rocket} kicker="New project" title="Deploy something new" description="Bring an application online from source code, a local project, or an existing container." />
@@ -297,22 +299,6 @@ export function NewProjectView() {
                 </ul>
                 <span className="np-card-cta">Upload files<ArrowRight aria-hidden /></span>
               </button>
-              <div className="np-target">
-                <span className="np-card-head">
-                  <span className="np-card-icon"><ServerIcon aria-hidden /></span>
-                  {target ? <ServerStatusView value={target.status} /> : null}
-                </span>
-                <strong>Deploys to {target?.name ?? "your server"}</strong>
-                <small>{target ? `${target.os} · ${target.ip}` : "Connect a server to deploy."}</small>
-                {target ? (
-                  <dl className="np-target-grid">
-                    <div><dt>Free memory</dt><dd>{formatGb(target.memoryTotalGb - target.memoryUsedGb)}</dd><SegmentMeter value={(target.memoryUsedGb / target.memoryTotalGb) * 100} label="Memory used" /></div>
-                    <div><dt>Free disk</dt><dd>{formatGb(target.storageTotalGb - target.storageUsedGb)}</dd><SegmentMeter value={(target.storageUsedGb / target.storageTotalGb) * 100} label="Disk used" /></div>
-                    <div className="np-target-row"><dt>Next port</dt><dd><code className="table-code">{nextFreePort(state.projects, state.settings.portStart)}</code></dd></div>
-                    <div className="np-target-row"><dt>Branch</dt><dd><code className="table-code">{state.settings.defaultBranch}</code></dd></div>
-                  </dl>
-                ) : null}
-              </div>
             </div>
           </section>
           <section className="mt-8">
@@ -330,24 +316,6 @@ export function NewProjectView() {
                 </button>
               ))}
             </div>
-          </section>
-          <section className="mt-8">
-            <SectionHeading title="How a deploy works" />
-            <ol className="np-flow">
-              {([
-                [ScanSearch, "Detect", "Reads package files to find the framework, build, and start commands."],
-                [SlidersHorizontal, "Configure", "Review ports, environment variables, and resources before anything runs."],
-                [Hammer, "Build", "Installs dependencies and builds an image on your server."],
-                [Globe2, "Go live", "Starts the container, checks health, and gives you a local URL."],
-              ] as const).map(([Icon, title, body], index) => (
-                <li key={title}>
-                  <span className="np-flow-num">{index + 1}</span>
-                  <IconTile icon={Icon} tone="brand" />
-                  <strong>{title}</strong>
-                  <small>{body}</small>
-                </li>
-              ))}
-            </ol>
           </section>
           <section className="np-frameworks">
             <p>Detected automatically</p>
@@ -697,7 +665,69 @@ export function NewProjectView() {
           </div>
         </form>
       ) : null}
+      </div>
+      <NewProjectAside stepIndex={STEPS.findIndex((item) => item.stages.includes(stage))} suggestedPort={suggestedPort} />
+      </div>
     </div>
+  )
+}
+
+const NEXT_STEPS = [
+  { title: "Choose a source", body: "GitHub, an upload, a Git URL, or a container image." },
+  { title: "Analyze", body: "Arcellite reads the files and detects the framework." },
+  { title: "Configure", body: "Review build commands, ports, and variables." },
+  { title: "Deploy", body: "The build runs on your server and gets a live URL." },
+]
+
+function NewProjectAside({ stepIndex, suggestedPort }: { stepIndex: number; suggestedPort: number }) {
+  const state = useDeployState()
+  if (!state) return null
+  const server = homeServer(state)
+  const recent = [...state.projects].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)).slice(0, 3)
+  return (
+    <aside className="np-aside" aria-label="Deployment details">
+      {server ? (
+        <section className="np-aside-card">
+          <p className="np-aside-label">Deploy target</p>
+          <div className="np-target">
+            <IconTile icon={Server} tone="brand" />
+            <span className="min-w-0 flex-1"><strong>{server.name}</strong><small>{server.os} · {server.ip}</small></span>
+            <ServerStatusView value={server.status} />
+          </div>
+          <dl className="np-target-stats">
+            <div><dt>CPU</dt><dd>{server.cpuPercent}%</dd><span className="meter"><span style={{ width: `${server.cpuPercent}%` }} /></span></div>
+            <div><dt>Memory</dt><dd>{formatGb(server.memoryUsedGb)} / {formatGb(server.memoryTotalGb)}</dd><span className="meter"><span style={{ width: `${server.memoryUsedGb / server.memoryTotalGb * 100}%` }} /></span></div>
+          </dl>
+          <p className="np-port"><span>Next free port</span><code>:{suggestedPort}</code></p>
+        </section>
+      ) : null}
+      <section className="np-aside-card">
+        <p className="np-aside-label">What happens next</p>
+        <ol className="np-timeline">
+          {NEXT_STEPS.map((step, index) => (
+            <li key={step.title} data-state={index < stepIndex ? "done" : index === stepIndex ? "current" : "todo"}>
+              <span className="np-timeline-dot">{index < stepIndex ? <Check aria-hidden /> : index + 1}</span>
+              <span><strong>{step.title}</strong><small>{step.body}</small></span>
+            </li>
+          ))}
+        </ol>
+      </section>
+      {recent.length ? (
+        <section className="np-aside-card">
+          <p className="np-aside-label">Recently deployed</p>
+          <ul className="np-recent">
+            {recent.map((project) => (
+              <li key={project.id}>
+                <Link href={`/projects/${project.id}`}>
+                  <span className="min-w-0 flex-1"><strong>{project.name}</strong><small>{FRAMEWORKS[project.framework].label} · <span className="capitalize">{project.environment}</span></small></span>
+                  <ArrowRight aria-hidden />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+    </aside>
   )
 }
 
