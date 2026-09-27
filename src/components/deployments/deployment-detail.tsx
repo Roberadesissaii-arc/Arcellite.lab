@@ -1,6 +1,6 @@
 "use client"
 
-import { Check, ExternalLink } from "lucide-react"
+import { AlertTriangle, Check, Copy, ExternalLink, Globe2, Loader2, Rocket, RotateCcw, X } from "lucide-react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
@@ -46,103 +46,121 @@ export function DeploymentDetail() {
   const sourceUrl = project?.source.type === "github" ? `https://github.com/${project.source.fullName}/commit/${view.commitSha}` : null
   const terminal = view.status === "ready" || view.status === "failed" || view.status === "canceled" || view.status === "stopped"
 
+  const duration = view.finishedAt ? Date.parse(view.finishedAt) - Date.parse(view.createdAt) : now - Date.parse(view.createdAt)
+  const pct = Math.round(fraction * 100)
+  const failed = view.status === "failed" || view.status === "canceled"
+  const activeStep = view.steps.find((step) => step.status === "active")
+
+  function cancel() {
+    setBusy("cancel")
+    void deploy.cancelDeployment(view.id).then(
+      () => {
+        toast({ title: "Deployment canceled" })
+        setBusy(null)
+      },
+      (error: unknown) => {
+        setBusy(null)
+        if (error instanceof DeployError) toast({ title: error.title, description: error.detail, tone: "danger" })
+      },
+    )
+  }
+  function redeploy() {
+    if (!project) return
+    setBusy("redeploy")
+    void deploy.redeploy(project.id).then(
+      (next) => {
+        toast({ title: "Redeploy started" })
+        router.push(`/deployments/${next.id}`)
+      },
+      (error: unknown) => {
+        setBusy(null)
+        if (error instanceof DeployError) toast({ title: error.title, description: error.detail, tone: "danger" })
+      },
+    )
+  }
+
   return (
-    <div className="page page-wide">
-      <p className="page-kicker">{project ? <Link href={`/projects/${project.id}`}>{project.name}</Link> : "Deployment"} · {view.environment}</p>
-      <div className="page-introduction mt-2">
-        <div>
-          <h1 className="page-title">{view.commitMessage}</h1>
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <DeploymentStatusView value={view.status} />
-            <span className="font-mono text-sm text-muted">{view.commitSha}</span>
-            <span className="text-sm text-faint">{formatRelative(view.createdAt, now)} · {view.triggeredBy}</span>
+    <div className="page page-wide page-stack dd">
+      <header className="page-introduction">
+        <div className="page-introduction-main">
+          <span className="page-introduction-icon"><Rocket aria-hidden /></span>
+          <div className="min-w-0">
+            <p className="page-kicker">{project ? <Link href={`/projects/${project.id}`} className="hover:text-[var(--brand-primary)]">{project.name}</Link> : "Deployment"} · <span className="capitalize">{view.environment}</span></p>
+            <h1 className="page-title mt-1 font-heading">{view.commitMessage || view.sourceLabel}<span className="text-brand">.</span></h1>
+            <div className="project-hero-meta">
+              <DeploymentStatusView value={view.status} />
+              <code className="table-code">{view.commitSha}</code>
+              <span className="text-[12px] text-faint">{formatRelative(view.createdAt, now)} · by {view.triggeredBy}</span>
+            </div>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="ghost" onClick={() => void copyText(view.id).then((ok) => toast(ok ? { title: "Deployment ID copied" } : { title: "Could not copy", tone: "danger" }))}>Copy ID</Button>
-          {sourceUrl ? <a className="btn btn-secondary" href={sourceUrl} target="_blank" rel="noreferrer">Source commit <ExternalLink aria-hidden /></a> : null}
+        <div className="page-introduction-actions">
+          <Button variant="ghost" onClick={() => void copyText(view.id).then((ok) => toast(ok ? { title: "Deployment ID copied" } : { title: "Could not copy", tone: "danger" }))}><Copy aria-hidden />Copy ID</Button>
+          {sourceUrl ? <a className="btn btn-secondary" href={sourceUrl} target="_blank" rel="noreferrer">Commit<ExternalLink aria-hidden /></a> : null}
           {!terminal ? (
-            <Button
-              variant="danger"
-              loading={busy === "cancel"}
-              onClick={() => {
-                setBusy("cancel")
-                void deploy.cancelDeployment(view.id).then(
-                  () => {
-                    toast({ title: "Deployment canceled" })
-                    setBusy(null)
-                  },
-                  (error: unknown) => {
-                    setBusy(null)
-                    if (error instanceof DeployError) toast({ title: error.title, description: error.detail, tone: "danger" })
-                  },
-                )
-              }}
-            >
-              Cancel
-            </Button>
+            <Button variant="danger" loading={busy === "cancel"} onClick={cancel}><X aria-hidden />Cancel</Button>
           ) : project ? (
-            <Button
-              variant="primary"
-              loading={busy === "redeploy"}
-              onClick={() => {
-                setBusy("redeploy")
-                void deploy.redeploy(project.id).then(
-                  (next) => {
-                    toast({ title: "Redeploy started" })
-                    router.push(`/deployments/${next.id}`)
-                  },
-                  (error: unknown) => {
-                    setBusy(null)
-                    if (error instanceof DeployError) toast({ title: error.title, description: error.detail, tone: "danger" })
-                  },
-                )
-              }}
-            >
-              Redeploy
-            </Button>
-          ) : null}
-          {view.status === "ready" && endpoint ? (
-            <a className="btn btn-primary" href={endpoint} target="_blank" rel="noreferrer">Visit <ExternalLink aria-hidden /></a>
+            <Button variant="primary" loading={busy === "redeploy"} onClick={redeploy}><RotateCcw aria-hidden />Redeploy</Button>
           ) : null}
         </div>
-      </div>
+      </header>
 
-      {view.error ? (
-        <section className="mt-8 max-w-2xl">
-          <h2 className="text-[15px] font-semibold text-[var(--status-danger)]">{view.error.title}</h2>
-          <p className="mt-2 text-sm">{view.error.detail}</p>
-          <p className="mt-2 text-sm text-muted">{view.error.affects}</p>
-          <p className="mt-2 text-sm">{view.error.action}</p>
-        </section>
-      ) : null}
+      {/* The URL slot keeps its size from the first frame: a placeholder while building, the live URL when ready. */}
+      <section className="dd-url" data-state={view.status === "ready" ? "ready" : failed ? "failed" : "building"}>
+        <span className="dd-url-icon" aria-hidden>{view.status === "ready" ? <Globe2 /> : failed ? <AlertTriangle /> : <Loader2 className="dd-spin" />}</span>
+        <div className="min-w-0 flex-1">
+          <p className="dd-url-label">{view.status === "ready" ? "Live — your deployment is serving" : failed ? view.error?.title ?? "Deployment stopped" : activeStep ? `${activeStep.label}…` : "Starting…"}</p>
+          {view.status === "ready" && endpoint ? (
+            <a className="dd-url-link" href={endpoint} target="_blank" rel="noreferrer">{endpoint}</a>
+          ) : failed ? (
+            <p className="dd-url-detail">{view.error ? `${view.error.detail} ${view.error.action}` : "This release did not finish. The previous release keeps serving."}</p>
+          ) : (
+            <p className="dd-url-placeholder"><span className="dd-url-skeleton" />Your URL appears here when the deploy finishes</p>
+          )}
+        </div>
+        {view.status === "ready" && endpoint ? (
+          <div className="dd-url-actions">
+            <Button variant="secondary" size="sm" onClick={() => void copyText(endpoint).then((ok) => toast(ok ? { title: "URL copied" } : { title: "Could not copy", tone: "danger" }))}><Copy aria-hidden />Copy</Button>
+            <a className="btn btn-primary btn-sm" href={endpoint} target="_blank" rel="noreferrer">Visit<ExternalLink aria-hidden /></a>
+          </div>
+        ) : (
+          <span className="dd-url-pct">{failed ? "—" : `${pct}%`}</span>
+        )}
+      </section>
 
-      <div className="mt-7 grid gap-6 xl:grid-cols-[minmax(0,300px)_minmax(0,1fr)]">
-        <section className="panel self-start p-5">
-          <div className="mb-3 flex items-center justify-between text-sm text-muted">
-            <span>{terminal ? "Finished" : "In progress"}</span>
-            <span className="tabular-nums">{view.finishedAt ? formatDuration(Date.parse(view.finishedAt) - Date.parse(view.createdAt)) : `${Math.round(fraction * 100)}%`}</span>
+      <div className="dd-grid">
+        <section className="panel dd-pipeline">
+          <div className="dd-pipeline-head">
+            <span className="dd-ring" style={{ "--pct": `${failed ? 100 : pct}%` } as React.CSSProperties} data-state={failed ? "failed" : terminal ? "done" : "running"}>
+              <strong>{failed ? "!" : terminal ? <Check aria-hidden /> : `${pct}`}</strong>
+            </span>
+            <div className="min-w-0">
+              <p className="dd-pipeline-title">{terminal ? (failed ? "Pipeline stopped" : "Pipeline complete") : "Building on your server"}</p>
+              <p className="dd-pipeline-sub">{view.steps.filter((step) => step.status === "completed").length} of {view.steps.length} steps · {formatDuration(duration)}</p>
+            </div>
           </div>
-          <div className="meter" aria-label="Deployment progress" role="progressbar" aria-valuenow={Math.round(fraction * 100)} aria-valuemin={0} aria-valuemax={100}>
-            <span style={{ width: `${fraction * 100}%` }} />
-          </div>
-          <ol className="mt-5">
-            {view.steps.map((step) => (
-              <li key={step.phase} className="grid grid-cols-[16px_1fr_auto] gap-3 border-b border-[var(--border-subtle)] py-3 text-sm">
-                <span aria-hidden className={step.status === "completed" ? "text-[var(--status-success)]" : step.status === "failed" || step.status === "canceled" ? "text-[var(--status-danger)]" : "text-faint"}>
-                  {step.status === "completed" ? <Check className="h-4 w-4" /> : step.status === "active" ? "•" : step.status === "failed" ? "!" : "○"}
-                </span>
-                <span>
-                  <span className={step.status === "pending" ? "text-faint" : "font-medium"}>{step.label}</span>
-                  {step.status === "active" ? <span className="ml-2 text-xs text-muted">Running</span> : null}
-                </span>
-                <span className="text-xs text-faint tabular-nums">{step.finishedAt ? formatClock(step.finishedAt) : step.startedAt ? formatClock(step.startedAt) : ""}</span>
-              </li>
-            ))}
+          <ol className="dd-steps">
+            {view.steps.map((step) => {
+              const took = step.startedAt && step.finishedAt ? Date.parse(step.finishedAt) - Date.parse(step.startedAt) : null
+              return (
+                <li key={step.phase} data-status={step.status}>
+                  <span className="dd-step-dot" aria-hidden>{step.status === "completed" ? <Check /> : step.status === "failed" || step.status === "canceled" ? <X /> : step.status === "active" ? <Loader2 className="dd-spin" /> : null}</span>
+                  <span className="min-w-0 flex-1">
+                    <strong>{step.label}</strong>
+                    <small>{step.status === "active" ? "Running now" : step.status === "pending" ? "Waiting" : step.status === "completed" ? `Done${step.finishedAt ? ` at ${formatClock(step.finishedAt)}` : ""}` : step.status === "failed" ? "Failed" : "Canceled"}</small>
+                  </span>
+                  <span className="dd-step-time">{took !== null ? formatDuration(took) : ""}</span>
+                </li>
+              )
+            })}
           </ol>
+          <dl className="dd-facts">
+            <div><dt>Branch</dt><dd>{view.branch ?? "upload"}</dd></div>
+            <div><dt>Duration</dt><dd>{formatDuration(duration)}</dd></div>
+          </dl>
         </section>
-        <section>
-          <h2 className="mb-3 text-[15px] font-semibold">Logs</h2>
+        <section className="dd-logs">
+          <p className="dd-logs-title">Build and runtime logs</p>
           <LogStream target="deployment" id={view.id} />
         </section>
       </div>

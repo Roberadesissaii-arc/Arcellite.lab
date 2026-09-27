@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useForm, useWatch } from "react-hook-form"
 import { z } from "zod"
 import Link from "next/link"
-import { ArrowRight, Check, Container, FileArchive, FolderGit2, FolderUp, GitBranch, Layers, Lock, Rocket, ScanSearch, Server, SlidersHorizontal, Upload, X } from "lucide-react"
+import { ArrowRight, Check, ChevronLeft, ChevronRight, Container, FileArchive, FolderGit2, FolderUp, GitBranch, Layers, Lock, Rocket, ScanSearch, Server, SlidersHorizontal, Upload, X } from "lucide-react"
 import { IconTile, SearchField, SectionHeading, Tag } from "@/components/ui/kit"
 import { GitHubMark } from "@/components/brand"
 import { PageHeader } from "@/components/page-header"
@@ -24,7 +24,6 @@ import {
   FRAMEWORK_ORDER,
 } from "@/lib/deploy/detect"
 import { formatBytes, formatGb, formatRelative } from "@/lib/deploy/format"
-import { ServerStatusView } from "@/components/ui/status"
 import { homeServer, nextFreePort, portTaken } from "@/lib/deploy/helpers"
 import { useDeploy, useDeployState } from "@/lib/deploy/react"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
@@ -61,6 +60,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 type Stage = "choose" | "github" | "upload" | "git" | "image" | "compose" | "analyze" | "configure"
 const LANGUAGE_COLOR: Record<string, string> = { TypeScript: "#3178c6", JavaScript: "#f1e05a", Python: "#3572a5", HTML: "#e34c26", Go: "#00add8", Rust: "#dea584" }
+const REPO_PAGE = 5
 const SOURCE_STAGES: Stage[] = ["choose", "github", "upload", "git", "image", "compose"]
 
 export function NewProjectView({ source: routeSource }: { source?: string } = {}) {
@@ -88,6 +88,7 @@ export function NewProjectView({ source: routeSource }: { source?: string } = {}
   }
   const [repoQuery, setRepoQuery] = useState("")
   const [repoFilter, setRepoFilter] = useState<"all" | "public" | "private">("all")
+  const [repoPage, setRepoPage] = useState(0)
   const [repo, setRepo] = useState<GitRepository | null>(null)
   const [branch, setBranch] = useState("main")
   const [upload, setUpload] = useState<{ name: string; size: number; progress: number; error: string | null } | null>(null)
@@ -148,7 +149,10 @@ export function NewProjectView({ source: routeSource }: { source?: string } = {}
   }, [state, repoQuery])
 
   if (!state) return <PageSkeleton variant="detail" />
-  const shownRepos = repos.filter((item) => repoFilter === "all" || (repoFilter === "private") === item.private)
+  const filteredRepos = repos.filter((item) => repoFilter === "all" || (repoFilter === "private") === item.private)
+  const repoPages = Math.max(1, Math.ceil(filteredRepos.length / REPO_PAGE))
+  const currentRepoPage = Math.min(repoPage, repoPages - 1)
+  const shownRepos = filteredRepos.slice(currentRepoPage * REPO_PAGE, (currentRepoPage + 1) * REPO_PAGE)
 
   function beginAnalysis(nextSource: ProjectSource, files: string[], suggestedName: string, suggestedBranch: string | null, environment?: FormValues["environment"]) {
     const result = analysisFromFiles(files)
@@ -301,11 +305,9 @@ export function NewProjectView({ source: routeSource }: { source?: string } = {}
         })}
       </ol>
       {header}
-      <div className="np-layout" data-stage={stage}>
-      <div className="np-main">
       {stage === "choose" ? (
-        <>
-          <section>
+        <div className="np-choose">
+          <section className="np-choose-cell">
             <SectionHeading title="Choose a source" />
             <div className="np-primary">
               <button type="button" className="np-card pressable" onClick={() => setStage("github")}>
@@ -338,7 +340,11 @@ export function NewProjectView({ source: routeSource }: { source?: string } = {}
               </button>
             </div>
           </section>
-          <section className="mt-8">
+          <section className="np-choose-cell">
+            <SectionHeading title="Deploy target" />
+            <DeployTargetCard suggestedPort={suggestedPort} />
+          </section>
+          <section className="np-choose-cell">
             <SectionHeading title="More ways to deploy" />
             <div className="np-more">
               {([
@@ -353,15 +359,21 @@ export function NewProjectView({ source: routeSource }: { source?: string } = {}
                 </button>
               ))}
             </div>
-          </section>
           <section className="np-frameworks">
             <p>Detected automatically</p>
             <div>
               {(["nextjs", "vite", "node", "express", "fastapi", "flask", "static", "dockerfile"] as const).map((key) => <Tag key={key}>{FRAMEWORKS[key].label}</Tag>)}
             </div>
           </section>
-        </>
-      ) : null}
+          </section>
+          <section className="np-choose-cell">
+            <SectionHeading title="What happens next" />
+            <NextStepsCard stepIndex={0} />
+          </section>
+        </div>
+      ) : (
+      <div className="np-layout" data-stage={stage}>
+      <div className="np-main">
 
       {stage === "github" ? (
         <section className="np-source">
@@ -375,15 +387,15 @@ export function NewProjectView({ source: routeSource }: { source?: string } = {}
           ) : (
             <>
               <div className="np-repo-toolbar">
-                <SearchField value={repoQuery} onChange={setRepoQuery} placeholder="Search repositories" label="Search repositories" />
+                <SearchField value={repoQuery} onChange={(value) => { setRepoQuery(value); setRepoPage(0) }} placeholder="Search repositories" label="Search repositories" />
                 <div className="segmented" role="group" aria-label="Visibility">
                   {(["all", "public", "private"] as const).map((item) => (
-                    <button key={item} type="button" aria-pressed={repoFilter === item} onClick={() => setRepoFilter(item)}>{item === "all" ? "All" : item === "public" ? "Public" : "Private"}</button>
+                    <button key={item} type="button" aria-pressed={repoFilter === item} onClick={() => { setRepoFilter(item); setRepoPage(0) }}>{item === "all" ? "All" : item === "public" ? "Public" : "Private"}</button>
                   ))}
                 </div>
               </div>
               <div className="np-repo-account">
-                <GitHubMark className="h-4 w-4" /><span><strong>{state.github.accountLogin}</strong> · {shownRepos.length} of {state.repositories.length} repositories</span>
+                <GitHubMark className="h-4 w-4" /><span><strong>{state.github.accountLogin}</strong> · {filteredRepos.length} of {state.repositories.length} repositories</span>
               </div>
               <ul className="np-repos" role="listbox" aria-label="Repositories">
                 {shownRepos.map((item, index) => {
@@ -412,6 +424,18 @@ export function NewProjectView({ source: routeSource }: { source?: string } = {}
                 })}
                 {shownRepos.length === 0 ? <li className="np-repo-empty">No repositories match “{repoQuery}”.</li> : null}
               </ul>
+              {filteredRepos.length > REPO_PAGE ? (
+                <div className="np-repo-pager">
+                  <span>Showing <strong>{currentRepoPage * REPO_PAGE + 1}–{Math.min(filteredRepos.length, (currentRepoPage + 1) * REPO_PAGE)}</strong> of {filteredRepos.length}</span>
+                  <span className="flex items-center gap-1">
+                    {Array.from({ length: repoPages }, (_, index) => (
+                      <button key={index} type="button" className="np-page-dot" aria-label={`Page ${index + 1}`} aria-current={index === currentRepoPage || undefined} onClick={() => setRepoPage(index)}>{index + 1}</button>
+                    ))}
+                    <button type="button" className="icon-btn" aria-label="Previous page" disabled={currentRepoPage === 0} onClick={() => setRepoPage(currentRepoPage - 1)}><ChevronLeft aria-hidden /></button>
+                    <button type="button" className="icon-btn" aria-label="Next page" disabled={currentRepoPage >= repoPages - 1} onClick={() => setRepoPage(currentRepoPage + 1)}><ChevronRight aria-hidden /></button>
+                  </span>
+                </div>
+              ) : null}
               <AnimatePresence initial={false}>
                 {repo ? (
                   <motion.div
@@ -641,125 +665,139 @@ export function NewProjectView({ source: routeSource }: { source?: string } = {}
       })() : null}
 
       {stage === "configure" ? (
-        <form
-          onSubmit={form.handleSubmit(onDeploy)}
-          className="mt-2"
-        >
-          <div className="mt-8 space-y-8">
-            <section className="panel space-y-4 p-5">
-              <h2 className="text-[15px] font-semibold">General</h2>
-              <Field label="Project name" error={form.formState.errors.name?.message}>
-                <TextInput {...form.register("name")} />
-              </Field>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Environment">
-                  <SelectInput {...form.register("environment")}>
-                    <option value="production">Production</option>
-                    <option value="preview">Preview</option>
-                    <option value="development">Development</option>
-                  </SelectInput>
-                </Field>
-                <Field label="Root directory">
-                  <TextInput {...form.register("rootDirectory")} />
-                </Field>
-              </div>
-            </section>
-            <section className="panel space-y-4 p-5">
-              <h2 className="text-[15px] font-semibold">Source</h2>
-              <p className="text-sm text-muted">{describeSource(source)}</p>
-              {source?.type === "github" ? (
-                <Field label="Branch">
-                  <TextInput {...form.register("branch")} />
-                </Field>
-              ) : null}
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" {...form.register("autoDeploy")} />
-                Deploy when the branch updates
-              </label>
-              <p className="field-hint">The preference is saved. GitHub webhooks arrive in a later phase.</p>
-            </section>
-            <section className="panel space-y-4 p-5">
-              <h2 className="text-[15px] font-semibold">Build</h2>
-              <Field label="Framework">
-                <SelectInput
-                  {...form.register("framework")}
-                  onChange={(event) => {
-                    const framework = event.target.value as Framework
-                    form.setValue("framework", framework)
-                    const profile = FRAMEWORKS[framework]
-                    form.setValue("installCommand", profile.installCommand)
-                    form.setValue("buildCommand", profile.buildCommand)
-                    form.setValue("startCommand", profile.startCommand)
-                    form.setValue("outputDirectory", profile.outputDirectory ?? "")
-                    form.setValue("internalPort", profile.internalPort)
-                    form.setValue("healthPath", profile.healthPath)
-                  }}
-                >
-                  {FRAMEWORK_ORDER.map((item) => (
-                    <option key={item} value={item}>{FRAMEWORKS[item].label}</option>
-                  ))}
+        <form onSubmit={form.handleSubmit(onDeploy)} className="npc">
+          <section className="npc-section">
+            <header className="npc-head"><span className="npc-icon"><SlidersHorizontal aria-hidden /></span><div><h2>General</h2><p>Name, environment, and where the app lives in the repository.</p></div></header>
+            <Field label="Project name" error={form.formState.errors.name?.message}>
+              <TextInput {...form.register("name")} />
+            </Field>
+            <div className="npc-grid">
+              <Field label="Environment">
+                <SelectInput {...form.register("environment")}>
+                  <option value="production">Production</option>
+                  <option value="preview">Preview</option>
+                  <option value="development">Development</option>
                 </SelectInput>
               </Field>
-              <Field label="Install command"><TextInput {...form.register("installCommand")} /></Field>
-              <Field label="Build command"><TextInput {...form.register("buildCommand")} /></Field>
-              <Field label="Start command" error={form.formState.errors.startCommand?.message}><TextInput {...form.register("startCommand")} /></Field>
-              <Field label="Output directory"><TextInput {...form.register("outputDirectory")} /></Field>
-            </section>
-            <section className="panel space-y-4 p-5">
-              <h2 className="text-[15px] font-semibold">Runtime</h2>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Internal port"><TextInput type="number" {...form.register("internalPort", { valueAsNumber: true })} /></Field>
-                <Field label="Health endpoint"><TextInput {...form.register("healthPath")} /></Field>
-              </div>
+              <Field label="Root directory">
+                <TextInput {...form.register("rootDirectory")} className="font-mono" />
+              </Field>
+            </div>
+          </section>
+
+          <section className="npc-section">
+            <header className="npc-head"><span className="npc-icon"><GitBranch aria-hidden /></span><div><h2>Source</h2><p>{describeSource(source)}</p></div></header>
+            {source?.type === "github" ? (
+              <Field label="Branch">
+                <TextInput {...form.register("branch")} className="font-mono" />
+              </Field>
+            ) : null}
+            <label className="npc-switch">
+              <input type="checkbox" className="sr-only" {...form.register("autoDeploy")} />
+              <span className="toggle" aria-hidden><span /></span>
+              <span><strong>Deploy when the branch updates</strong><small>Saved now. GitHub webhooks arrive in a later phase.</small></span>
+            </label>
+          </section>
+
+          <section className="npc-section">
+            <header className="npc-head"><span className="npc-icon"><Layers aria-hidden /></span><div><h2>Build</h2><p>Detected from your files. Change anything that looks off.</p></div></header>
+            <Field label="Framework">
+              <SelectInput
+                {...form.register("framework")}
+                onChange={(event) => {
+                  const framework = event.target.value as Framework
+                  form.setValue("framework", framework)
+                  const profile = FRAMEWORKS[framework]
+                  form.setValue("installCommand", profile.installCommand)
+                  form.setValue("buildCommand", profile.buildCommand)
+                  form.setValue("startCommand", profile.startCommand)
+                  form.setValue("outputDirectory", profile.outputDirectory ?? "")
+                  form.setValue("internalPort", profile.internalPort)
+                  form.setValue("healthPath", profile.healthPath)
+                }}
+              >
+                {FRAMEWORK_ORDER.map((item) => (
+                  <option key={item} value={item}>{FRAMEWORKS[item].label}</option>
+                ))}
+              </SelectInput>
+            </Field>
+            <div className="ps-commands npc-commands">
+              {([["installCommand", "Install", "pnpm install"], ["buildCommand", "Build", "pnpm build"], ["startCommand", "Start", "pnpm start"]] as const).map(([key, label, placeholder], index) => (
+                <label key={key} className="ps-command">
+                  <span className="ps-command-step">{index + 1}</span>
+                  <span className="ps-command-label">{label}</span>
+                  <span className="ps-command-input"><span aria-hidden>$</span><input {...form.register(key)} placeholder={placeholder} spellCheck={false} /></span>
+                </label>
+              ))}
+            </div>
+            {form.formState.errors.startCommand?.message ? <p className="field-error">{form.formState.errors.startCommand.message}</p> : null}
+            <Field label="Output directory"><TextInput {...form.register("outputDirectory")} className="font-mono" placeholder="Not needed for this framework" /></Field>
+          </section>
+
+          <section className="npc-section">
+            <header className="npc-head"><span className="npc-icon"><Server aria-hidden /></span><div><h2>Runtime</h2><p>How the container listens and how traffic reaches it.</p></div></header>
+            <div className="npc-grid">
+              <Field label="Internal port"><TextInput type="number" {...form.register("internalPort", { valueAsNumber: true })} /></Field>
+              <Field label="Health endpoint"><TextInput {...form.register("healthPath")} className="font-mono" /></Field>
               <Field label="Exposure">
                 <SelectInput {...form.register("portMode")}>
                   <option value="auto">Auto-assigned port</option>
                   <option value="custom">Custom port</option>
                 </SelectInput>
               </Field>
-              <Field label="Host port" hint={portMode === "auto" ? "Assigned from the next free port on this server." : "Must be free on this server."}>
+              <Field label="Host port" hint={portMode === "auto" ? "Assigned from the next free port." : "Must be free on this server."}>
                 <TextInput type="number" disabled={portMode === "auto"} {...form.register("exposedPort", { valueAsNumber: true })} />
               </Field>
-            </section>
+            </div>
+          </section>
+
+          <section className="npc-section">
             <EnvEditor value={env} onChange={setEnv} />
-            <section>
-              <button type="button" className="text-sm font-medium text-muted" onClick={() => setAdvanced((value) => !value)} aria-expanded={advanced}>
-                {advanced ? "Hide advanced" : "Advanced"}
-              </button>
-              {advanced ? (
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <Field label="CPU limit" hint="Leave empty for no limit.">
-                    <TextInput {...form.register("cpuLimit")} inputMode="decimal" />
-                  </Field>
-                  <Field label="Memory limit (MB)">
-                    <TextInput {...form.register("memoryLimitMb")} inputMode="numeric" />
-                  </Field>
-                  <Field label="Restart policy">
-                    <SelectInput {...form.register("restartPolicy")}>
-                      <option value="unless-stopped">unless-stopped</option>
-                      <option value="on-failure">on-failure</option>
-                      <option value="always">always</option>
-                      <option value="no">no</option>
-                    </SelectInput>
-                  </Field>
-                  <label className="flex items-center gap-2 self-end text-sm">
-                    <input type="checkbox" {...form.register("simulateFailure")} />
-                    Simulate a failed build
-                  </label>
-                </div>
-              ) : null}
-            </section>
-          </div>
-          {formError ? <p className="field-error mt-4">{formError}</p> : null}
-          <div className="mt-8 flex gap-2">
-            <Button type="button" variant="ghost" onClick={() => setStage("analyze")}>Back</Button>
-            <Button type="submit" variant="primary" loading={deploying}>Deploy</Button>
+          </section>
+
+          <section className="npc-section npc-advanced" data-open={advanced}>
+            <button type="button" className="npc-advanced-toggle" onClick={() => setAdvanced((value) => !value)} aria-expanded={advanced}>
+              <span className="npc-icon"><SlidersHorizontal aria-hidden /></span>
+              <span className="flex-1 text-left"><strong>Advanced</strong><small>Resource limits, restart policy, and failure testing.</small></span>
+              <ChevronRight aria-hidden className="npc-chevron" />
+            </button>
+            {advanced ? (
+              <div className="npc-grid">
+                <Field label="CPU limit" hint="Leave empty for no limit.">
+                  <TextInput {...form.register("cpuLimit")} inputMode="decimal" />
+                </Field>
+                <Field label="Memory limit (MB)">
+                  <TextInput {...form.register("memoryLimitMb")} inputMode="numeric" />
+                </Field>
+                <Field label="Restart policy">
+                  <SelectInput {...form.register("restartPolicy")}>
+                    <option value="unless-stopped">unless-stopped</option>
+                    <option value="on-failure">on-failure</option>
+                    <option value="always">always</option>
+                    <option value="no">no</option>
+                  </SelectInput>
+                </Field>
+                <label className="npc-switch self-end">
+                  <input type="checkbox" className="sr-only" {...form.register("simulateFailure")} />
+                  <span className="toggle" aria-hidden><span /></span>
+                  <span><strong>Simulate a failed build</strong><small>For testing alerts.</small></span>
+                </label>
+              </div>
+            ) : null}
+          </section>
+
+          {formError ? <p className="field-error">{formError}</p> : null}
+          <div className="npc-deploybar">
+            <Button type="button" variant="ghost" onClick={() => setStage("analyze")}><ArrowRight aria-hidden className="rotate-180" />Back</Button>
+            <span className="npc-deploybar-note">Builds on <strong>{homeServer(state)?.name ?? "your server"}</strong> and gets a live URL.</span>
+            <Button type="submit" variant="primary" loading={deploying}><Rocket aria-hidden />Deploy</Button>
           </div>
         </form>
       ) : null}
       </div>
       <NewProjectAside stepIndex={STEPS.findIndex((item) => item.stages.includes(stage))} suggestedPort={suggestedPort} />
       </div>
+      )}
       {stage === "choose" ? <RecentlyDeployed /> : null}
     </div>
   )
@@ -773,38 +811,51 @@ const NEXT_STEPS = [
 ]
 
 function NewProjectAside({ stepIndex, suggestedPort }: { stepIndex: number; suggestedPort: number }) {
+  return (
+    <aside className="np-aside" aria-label="Deployment details">
+      <DeployTargetCard suggestedPort={suggestedPort} labelled />
+      <NextStepsCard stepIndex={stepIndex} labelled />
+    </aside>
+  )
+}
+
+function DeployTargetCard({ suggestedPort, labelled = false }: { suggestedPort: number; labelled?: boolean }) {
   const state = useDeployState()
   if (!state) return null
   const server = homeServer(state)
+  if (!server) return null
   return (
-    <aside className="np-aside" aria-label="Deployment details">
-      {server ? (
-        <section className="np-aside-card">
-          <p className="np-aside-label">Deploy target</p>
-          <div className="np-target">
-            <IconTile icon={Server} tone="brand" />
-            <span className="min-w-0 flex-1"><strong>{server.name}</strong><small>{server.os} · {server.ip}</small></span>
-            <ServerStatusView value={server.status} />
-          </div>
-          <dl className="np-target-stats">
-            <div><dt>CPU</dt><dd>{server.cpuPercent}%</dd><span className="meter"><span style={{ width: `${server.cpuPercent}%` }} /></span></div>
-            <div><dt>Memory</dt><dd>{formatGb(server.memoryUsedGb)} / {formatGb(server.memoryTotalGb)}</dd><span className="meter"><span style={{ width: `${server.memoryUsedGb / server.memoryTotalGb * 100}%` }} /></span></div>
-          </dl>
-          <p className="np-port"><span>Next free port</span><code>:{suggestedPort}</code></p>
-        </section>
-      ) : null}
-      <section className="np-aside-card">
-        <p className="np-aside-label">What happens next</p>
-        <ol className="np-timeline">
-          {NEXT_STEPS.map((step, index) => (
-            <li key={step.title} data-state={index < stepIndex ? "done" : index === stepIndex ? "current" : "todo"}>
-              <span className="np-timeline-dot">{index < stepIndex ? <Check aria-hidden /> : index + 1}</span>
-              <span><strong>{step.title}</strong><small>{step.body}</small></span>
-            </li>
-          ))}
-        </ol>
-      </section>
-    </aside>
+    <section className="np-aside-card np-target-card">
+      {labelled ? <p className="np-aside-label">Deploy target</p> : null}
+      <div className="np-target">
+        <span className="np-target-icon"><Server aria-hidden /></span>
+        <span className="min-w-0 flex-1"><strong>{server.name}</strong><small>{server.os} · {server.ip}</small></span>
+        <span className="np-target-status" data-status={server.status}><i aria-hidden />{server.status === "online" ? "Online" : server.status}</span>
+      </div>
+      <dl className="np-target-stats">
+        <div><dt>CPU</dt><dd>{server.cpuPercent}%</dd><span className="meter"><span style={{ width: `${server.cpuPercent}%` }} /></span></div>
+        <div><dt>Memory</dt><dd>{formatGb(server.memoryUsedGb)} / {formatGb(server.memoryTotalGb)}</dd><span className="meter"><span style={{ width: `${(server.memoryUsedGb / server.memoryTotalGb) * 100}%` }} /></span></div>
+        <div><dt>Disk</dt><dd>{formatGb(server.storageUsedGb)} / {formatGb(server.storageTotalGb)}</dd><span className="meter"><span style={{ width: `${(server.storageUsedGb / server.storageTotalGb) * 100}%` }} /></span></div>
+        <div><dt>Projects</dt><dd>{state.projects.length} on this server</dd><span className="meter"><span style={{ width: `${Math.min(100, state.projects.length * 20)}%` }} /></span></div>
+      </dl>
+      <p className="np-port"><span>Next free port</span><code>:{suggestedPort}</code></p>
+    </section>
+  )
+}
+
+function NextStepsCard({ stepIndex, labelled = false }: { stepIndex: number; labelled?: boolean }) {
+  return (
+    <section className="np-aside-card np-next-card">
+      {labelled ? <p className="np-aside-label">What happens next</p> : null}
+      <ol className="np-timeline">
+        {NEXT_STEPS.map((step, index) => (
+          <li key={step.title} data-state={index < stepIndex ? "done" : index === stepIndex ? "current" : "todo"}>
+            <span className="np-timeline-dot">{index < stepIndex ? <Check aria-hidden /> : index + 1}</span>
+            <span><strong>{step.title}</strong><small>{step.body}</small></span>
+          </li>
+        ))}
+      </ol>
+    </section>
   )
 }
 
