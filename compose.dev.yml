@@ -1,0 +1,27 @@
+# Development PostgreSQL for the Arcellite Deploy control plane.
+# This file runs the database only. Arcellite itself does not control Docker.
+#   docker compose -f compose.dev.yml up -d
+name: arcellite-dev
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: arcellite
+      # Local development only. Change it for anything reachable from a network.
+      POSTGRES_PASSWORD: arcellite-dev
+      POSTGRES_DB: arcellite
+    ports:
+      # Bound to loopback so the dev database is not exposed on the LAN.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - arcellite-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arcellite -d arcellite"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  arcellite-postgres:

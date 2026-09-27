@@ -37,3 +37,16 @@ export const EnvVarWriteSchema = z
     path: ["value"],
   })
 export type EnvVarWrite = z.infer<typeof EnvVarWriteSchema>
+
+/**
+ * A change to an existing variable. Omitting `value` keeps the stored (encrypted) value,
+ * so a secret can be renamed, rescoped, or reclassified without ever being sent back.
+ */
+export const EnvVarPatchSchema = z
+  .strictObject({ key: EnvKeySchema, scope: EnvScopeSchema, secret: z.boolean(), value: EnvValueSchema })
+  .partial()
+export type EnvVarPatch = z.infer<typeof EnvVarPatchSchema>
+
+/** Create: every field required, including the value. */
+export const EnvVarCreateSchema = z.strictObject({ key: EnvKeySchema, scope: EnvScopeSchema, secret: z.boolean(), value: EnvValueSchema })
+export type EnvVarCreate = z.infer<typeof EnvVarCreateSchema>

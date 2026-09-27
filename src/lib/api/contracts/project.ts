@@ -58,3 +58,84 @@ export const ProjectDtoSchema = z.strictObject({
   updatedAt: TimestampSchema,
 })
 export type ProjectDTO = z.infer<typeof ProjectDtoSchema>
+
+const SafeRelativePathSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(255)
+  .refine((value) => !value.startsWith("/") && !value.split("/").includes("..") && !value.includes("\0"), "Use a path inside the project.")
+
+const CommandSchema = z.string().max(2048).refine((value) => !/[\0\r\n]/.test(value), "Commands must be a single line.")
+
+/**
+ * Source identity accepted from the browser. Syntax only: nothing is fetched yet.
+ * Git URLs must be https (no file://, no embedded credentials).
+ */
+export const ProjectSourceInputSchema = z.discriminatedUnion("type", [
+  z.strictObject({
+    type: z.literal("github"),
+    owner: z.string().regex(/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/),
+    repo: z.string().regex(/^[A-Za-z0-9._-]{1,100}$/),
+    fullName: z.string().max(140),
+  }),
+  z.strictObject({
+    type: z.literal("upload"),
+    filename: z.string().trim().min(1).max(255).refine((value) => !/[\\/\0]/.test(value), "A file name, not a path."),
+    size: z.number().int().nonnegative().max(1024 * 1024 * 1024),
+  }),
+  z.strictObject({
+    type: z.literal("git"),
+    url: z
+      .string()
+      .trim()
+      .max(2048)
+      .refine((value) => {
+        try {
+          const url = new URL(value)
+          return url.protocol === "https:" && !url.username && !url.password && Boolean(url.hostname)
+        } catch {
+          return false
+        }
+      }, "Use an https:// repository URL without credentials."),
+  }),
+  z.strictObject({
+    type: z.literal("image"),
+    image: z
+      .string()
+      .trim()
+      .max(512)
+      .regex(/^[a-z0-9]+([._-][a-z0-9]+)*(:[0-9]+)?(\/[a-z0-9]+([._-][a-z0-9]+)*)*(:[A-Za-z0-9_][A-Za-z0-9._-]{0,127})?(@sha256:[a-f0-9]{64})?$/, "Use an image reference such as nginx:1.27-alpine."),
+  }),
+  z.strictObject({ type: z.literal("compose"), filename: SafeRelativePathSchema }),
+  z.strictObject({ type: z.literal("dockerfile"), filename: SafeRelativePathSchema }),
+])
+export type ProjectSourceInput = z.infer<typeof ProjectSourceInputSchema>
+
+const projectConfigFields = {
+  name: z.string().trim().min(1, "Name the project.").max(64),
+  environment: EnvironmentNameSchema,
+  framework: FrameworkSchema,
+  branch: z.string().trim().min(1).max(255).regex(/^[^\s~^:?*[\\]+$/, "Not a valid branch name.").nullable(),
+  rootDirectory: SafeRelativePathSchema,
+  packageManager: z.string().max(32).nullable(),
+  installCommand: CommandSchema,
+  buildCommand: CommandSchema,
+  startCommand: CommandSchema,
+  outputDirectory: SafeRelativePathSchema.nullable(),
+  internalPort: PortSchema,
+  exposedPort: PortSchema,
+  portMode: PortModeSchema,
+  healthPath: z.string().trim().min(1).max(512).regex(/^\/[^\s]*$/, "Start the health path with /."),
+  restartPolicy: RestartPolicySchema,
+  cpuLimit: z.number().min(0.1).max(256).nullable(),
+  memoryLimitMb: z.number().int().min(64).max(1024 * 1024).nullable(),
+  autoDeploy: z.boolean(),
+}
+
+/** Create a project. Environment variables are a separate resource. */
+export const ProjectCreateRequestSchema = z.strictObject({ ...projectConfigFields, source: ProjectSourceInputSchema })
+export type ProjectCreateRequest = z.infer<typeof ProjectCreateRequestSchema>
+
+export const ProjectUpdateRequestSchema = z.strictObject(projectConfigFields).partial()
+export type ProjectUpdateRequest = z.infer<typeof ProjectUpdateRequestSchema>

@@ -24,6 +24,8 @@ const TITLES: Record<ApiErrorCode, string> = {
   FORBIDDEN: "Not allowed",
   CSRF_FAILED: "Request blocked",
   RATE_LIMITED: "Too many requests",
+  FEATURE_NOT_AVAILABLE: "Not available yet",
+  SERVICE_UNAVAILABLE: "Control plane unavailable",
   INTERNAL_ERROR: "Something failed",
 }
 
