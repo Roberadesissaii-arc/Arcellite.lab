@@ -126,6 +126,7 @@ function crumbLabel(pathname: string): string {
     "/events": "Events",
     "/alerts": "Alerts",
     "/docs": "Docs",
+    "/developer": "Developer tools",
     "/notifications": "Notifications",
     "/settings": "Settings",
     "/profile": "Profile",
