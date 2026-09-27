@@ -30,6 +30,7 @@ export const mockDeployProvider: DeployProvider = {
   updateSettings: (patch) => wrap(actions.updateSettings(patch)),
   completeOnboarding: () => wrap(actions.completeOnboarding()),
   resetDemo: () => wrap(actions.resetDemo()),
+  clearWorkspace: () => wrap(actions.clearWorkspace()),
   metrics: (serverId) => wrap(actions.metrics(serverId)),
   logs: (query) => wrap(actions.logs(query)),
 }

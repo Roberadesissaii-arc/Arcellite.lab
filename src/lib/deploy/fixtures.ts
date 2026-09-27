@@ -859,3 +859,25 @@ export function createInitialState(now: number): AppState {
     repositories,
   }
 }
+
+/**
+ * A fresh workspace: this machine is registered, nothing else exists yet.
+ * The lab fixture above stays available from Settings → Advanced.
+ */
+export function createEmptyState(now: number): AppState {
+  const demo = createInitialState(now)
+  return {
+    ...demo,
+    onboardingComplete: false,
+    github: { ...demo.github, connected: false },
+    projects: [],
+    deployments: [],
+    containers: [],
+    domains: [],
+    volumes: [],
+    databases: [],
+    activity: [],
+    operationalLogs: [],
+    repositories: demo.repositories.map((repo) => ({ ...repo, importedProjectId: null })),
+  }
+}

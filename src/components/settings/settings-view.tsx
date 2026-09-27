@@ -73,7 +73,7 @@ export function SettingsView() {
   const section: Section = choice && choice.from === requested ? choice.section : SECTIONS.find((item) => item === requested) ?? "General"
   const setSection = (next: Section) => setChoice({ from: requested, section: next })
   const [disconnect, setDisconnect] = useState(false)
-  const [reset, setReset] = useState(false)
+  const [reset, setReset] = useState<"demo" | "empty" | null>(null)
   if (!state) return <PageSkeleton variant="detail" />
   const settings = state.settings
   const set = (patch: Partial<SettingsShape>, title = "Setting saved") => void deploy.updateSettings(patch).then(() => toast({ title }))
@@ -274,7 +274,8 @@ export function SettingsView() {
                 </Row>
               </Group>
               <Group title="Danger zone">
-                <Row label="Reset demo data" hint="Projects, deployments, and domains return to the original lab fixture."><Button variant="danger" size="sm" onClick={() => setReset(true)}>Reset</Button></Row>
+                <Row label="Load demo data" hint="Replace this workspace with sample projects, deployments, and domains to explore."><Button variant="secondary" size="sm" onClick={() => setReset("demo")}>Load demo</Button></Row>
+                <Row label="Clear workspace" hint="Remove every project, deployment, domain, and log. This server stays registered."><Button variant="danger" size="sm" onClick={() => setReset("empty")}>Clear</Button></Row>
               </Group>
             </> : null}
           </div>
@@ -295,16 +296,17 @@ export function SettingsView() {
         }}
       />
       <ConfirmDialog
-        open={reset}
-        title="Reset demo data?"
-        body="Projects, deployments, and domains return to the original lab fixture. Theme and motion preferences stay."
-        confirmLabel="Reset demo"
+        open={reset !== null}
+        title={reset === "demo" ? "Load demo data?" : "Clear this workspace?"}
+        body={reset === "demo" ? "Everything in the workspace is replaced with the sample lab. Theme and motion preferences stay." : "Projects, deployments, domains, volumes, and logs are removed. Settings stay."}
+        confirmLabel={reset === "demo" ? "Load demo" : "Clear workspace"}
         danger
-        onOpenChange={setReset}
+        onOpenChange={(open) => { if (!open) setReset(null) }}
         onConfirm={() => {
-          void deploy.resetDemo().then(() => {
-            toast({ title: "Demo data reset" })
-            setReset(false)
+          const action = reset === "demo" ? deploy.resetDemo() : deploy.clearWorkspace()
+          void action.then(() => {
+            toast({ title: reset === "demo" ? "Demo data loaded" : "Workspace cleared" })
+            setReset(null)
           })
         }}
       />

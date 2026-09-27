@@ -157,7 +157,12 @@ export function LogStream({
             setFollow(bottom)
           }}
         >
-          {rows.length === 0 ? <p className="log-empty">No log lines match. Try another level or search.</p> : null}
+          {rows.length === 0 ? (everything.length === 0 && !search ? (
+            <div className="log-waiting">
+              <p><span className="log-prompt">$</span> Waiting for the first log line<span className="log-cursor" aria-hidden /></p>
+              <small>Build output and runtime logs stream here as soon as something is deployed.</small>
+            </div>
+          ) : <p className="log-empty">No log lines match. Try another level or search.</p>) : null}
           {rows.map((row, index) => (
             <div key={row.id} className="log-row" data-level={row.level}>
               <span className="log-num" aria-hidden>{index + 1}</span>

@@ -1,5 +1,5 @@
 import { cancelDeployment, isTerminal, materializeDeployment, sourceLabel } from "./engine"
-import { createInitialState } from "./fixtures"
+import { createEmptyState, createInitialState } from "./fixtures"
 import {
   classifyHostname,
   createId,
@@ -30,11 +30,12 @@ import type {
 } from "./types"
 import { DeployError, SCHEMA_VERSION } from "./types"
 
-const STORAGE_KEY = "arcellite-deploy-state-v1"
+// v2: workspaces start empty; v1 held the seeded lab fixture.
+const STORAGE_KEY = "arcellite-deploy-state-v2"
 export const THEME_KEY = "arcellite-deploy-theme"
 export const MOTION_KEY = "arcellite-deploy-motion"
 
-const serverSnapshot: AppState = createInitialState(0)
+const serverSnapshot: AppState = createEmptyState(0)
 let current: AppState = serverSnapshot
 let ready = false
 let boots = 0
@@ -403,7 +404,7 @@ export function bootStore(): () => void {
   boots += 1
   if (!ready && typeof window !== "undefined") {
     const stored = readStorage()
-    current = stored ?? createInitialState(Date.now())
+    current = stored ?? createEmptyState(Date.now())
     if (!stored) writeStorage(current)
     ready = true
     syncPrefs(current)
@@ -841,6 +842,13 @@ export const actions = {
   completeOnboarding(): void {
     if (current.onboardingComplete) return
     commit({ ...current, onboardingComplete: true })
+  },
+
+  clearWorkspace(): void {
+    const fresh = createEmptyState(Date.now())
+    fresh.settings = current.settings
+    fresh.onboardingComplete = true
+    commit(fresh)
   },
 
   resetDemo(): void {

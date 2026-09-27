@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useState } from "react"
 import { motion, useReducedMotion } from "motion/react"
-import { ArrowUpRight, Check, CircleAlert, CircleCheck, GitBranch, Hammer, Loader, Loader2, Workflow, X } from "lucide-react"
+import { ArrowUpRight, Check, CircleAlert, CircleCheck, FolderInput, GitBranch, Hammer, HeartPulse, Layers, Loader, Loader2, Package, Play, Rocket, Workflow, X } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 import { PageSkeleton } from "@/components/ui/bits"
 import { EmptyPanel, SectionHeading, StatCard, StatGrid } from "@/components/ui/kit"
@@ -13,6 +13,8 @@ import { formatDuration, formatRelative } from "@/lib/deploy/format"
 import { useDeployState } from "@/lib/deploy/react"
 import type { Deployment } from "@/lib/deploy/types"
 import { useNow } from "@/lib/use-now"
+
+const STAGE_ICONS = [FolderInput, Package, Hammer, Layers, Play, HeartPulse, Rocket]
 
 const FILTERS = [
   { id: "all", label: "All" },
@@ -86,9 +88,11 @@ export function PipelinesView() {
                   transition={{ type: "spring", bounce: 0, duration: 0.4, delay: index * 0.04 }}
                   data-state={stage.running ? "running" : stage.failures ? "warn" : "ok"}
                 >
-                  <span className="pl-stage-index">{index + 1}</span>
+                  <span className="pl-stage-top">
+                    <span className="pl-stage-icon" aria-hidden>{(() => { const Icon = STAGE_ICONS[index] ?? Workflow; return <Icon /> })()}</span>
+                    <span className="pl-stage-time">{stage.avg ? formatDuration(stage.avg) : "—"}</span>
+                  </span>
                   <strong>{stage.label}</strong>
-                  <span className="pl-stage-time">{stage.avg ? formatDuration(stage.avg) : "—"}</span>
                   <span className="pl-stage-bar" aria-hidden><motion.i initial={reduced ? false : { width: 0 }} animate={{ width: `${(stage.avg / slowest) * 100}%` }} transition={{ type: "spring", bounce: 0, duration: 0.6, delay: 0.1 + index * 0.04 }} /></span>
                   <small>{stage.failures ? `${stage.failures} failed` : stage.running ? `${stage.running} running` : `${stage.passed} passed`}</small>
                 </motion.li>

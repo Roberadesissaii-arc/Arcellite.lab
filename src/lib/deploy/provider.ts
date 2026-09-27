@@ -39,6 +39,7 @@ export interface DeployProvider {
   updateSettings(patch: Partial<Settings>): Promise<Settings>
   completeOnboarding(): Promise<void>
   resetDemo(): Promise<void>
+  clearWorkspace(): Promise<void>
   metrics(serverId: string): Promise<ServerMetrics>
   logs(query: LogQuery): Promise<LogEntry[]>
 }

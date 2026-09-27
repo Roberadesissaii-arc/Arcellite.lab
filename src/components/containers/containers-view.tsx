@@ -85,7 +85,7 @@ export function ContainersView() {
             {state.servers.map((server) => <option key={server.id} value={server.id}>{server.name}</option>)}
           </SelectInput>
         </div>
-        {rows.length === 0 ? <EmptyPanel icon={Boxes} title="No containers match" body="Try another state, server, or search." /> : (
+        {rows.length === 0 ? (state.containers.length === 0 ? <EmptyPanel icon={Boxes} title="No containers yet" body="Containers appear here when you deploy a project. Each project runs in its own container." action={<Link href="/projects/new" className="btn btn-primary">Deploy a project</Link>} /> : <EmptyPanel icon={Boxes} title="No containers match" body="Try another state, server, or search." />) : (
           <div className="panel data-table-wrap">
             <div className="data-table-scroll">
               <table className="data-table container-table">

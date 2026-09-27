@@ -183,10 +183,17 @@ export function SearchField({
 }
 
 /** Soft empty state inside a panel, with an icon tile. */
-export function EmptyPanel({ icon, title, body, action }: { icon: LucideIcon; title: string; body: string; action?: React.ReactNode }) {
+/**
+ * Placeholder for an empty list: a faint preview of the rows that will appear,
+ * the section's icon, a short explanation, and an optional next step.
+ */
+export function EmptyPanel({ icon: Icon, title, body, action }: { icon: LucideIcon; title: string; body: string; action?: React.ReactNode }) {
   return (
     <div className="panel empty-panel">
-      <IconTile icon={icon} tone="brand" size="lg" />
+      <div className="empty-ghost" aria-hidden>
+        {[0, 1, 2].map((row) => <span key={row}><i /><b /><em /></span>)}
+      </div>
+      <span className="empty-icon" aria-hidden><Icon /></span>
       <h2>{title}</h2>
       <p>{body}</p>
       {action ? <div className="mt-4">{action}</div> : null}
