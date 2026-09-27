@@ -5,8 +5,9 @@ import Link from "next/link"
 import * as Dialog from "@radix-ui/react-dialog"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 import { springSheet } from "@/lib/motion"
+import { ThinkingOrb, type OrbState } from "@/components/ui/thinking-orbs"
 import { formatRelative } from "@/lib/deploy/format"
-import { Activity, ArrowUp, ArrowUpRight, Globe2, History, Info, Layers, MessageSquare, Server, Sparkle, SquarePen, Trash2, TriangleAlert, X, type LucideIcon } from "lucide-react"
+import { Activity, ArrowUp, ArrowUpRight, Globe2, History, Info, Layers, MessageSquare, Server, Sparkle, Square, SquarePen, Trash2, TriangleAlert, X, type LucideIcon } from "lucide-react"
 import { useDeployState } from "@/lib/deploy/react"
 import { answerProjectQuestion, type AssistantReply } from "@/lib/deploy/assistant"
 import { formatReply } from "@/lib/deploy/assistant-format"
@@ -58,6 +59,14 @@ function ChatSession() {
   const [history,setHistory] = useState<Conversation[]>(readHistory)
   const [activeId,setActiveId] = useState<string | null>(null)
   const [historyOpen,setHistoryOpen] = useState(false)
+  const [thinking,setThinking] = useState<{ steps: ThinkingStep[]; index: number } | null>(null)
+  const timers = useRef<number[]>([])
+  function stopThinking() {
+    timers.current.forEach(timer => window.clearTimeout(timer))
+    timers.current = []
+    setThinking(null)
+  }
+  useEffect(() => () => timers.current.forEach(timer => window.clearTimeout(timer)), [])
   function saveHistory(next: Conversation[]) {
     setHistory(next)
     try { localStorage.setItem(HISTORY_KEY, JSON.stringify(next)) } catch { /* History is best-effort without storage. */ }
@@ -70,11 +79,13 @@ function ChatSession() {
     return [{ id, title, messages, updatedAt: Date.now() }, ...list.filter(item => item.id !== id)].slice(0, 30)
   }
   function newChat() {
+    stopThinking()
     saveHistory(archive())
     setMessages([])
     setActiveId(null)
   }
   function openConversation(item: Conversation) {
+    stopThinking()
     const next = archive().filter(entry => entry.id !== item.id)
     saveHistory([item, ...next])
     setMessages(item.messages)
@@ -94,14 +105,32 @@ function ChatSession() {
     }
   }, [])
   const log = useRef<HTMLDivElement>(null)
-  useEffect(()=>{try {localStorage.setItem(KEY,JSON.stringify(messages))}catch{/* Chat remains usable without storage. */} log.current?.scrollTo({top:log.current.scrollHeight})},[messages])
+  useEffect(()=>{try {localStorage.setItem(KEY,JSON.stringify(messages))}catch{/* Chat remains usable without storage. */} log.current?.scrollTo({top:log.current.scrollHeight, behavior: 'smooth'})},[messages])
+  useEffect(()=>{ if (thinking) log.current?.scrollTo({top:log.current.scrollHeight, behavior: 'smooth'}) },[thinking])
   if(!state) return <PageSkeleton variant="chat" />
   const initials = state.settings.displayName.split(/\s+/).filter(Boolean).slice(0,2).map(part=>part[0]?.toUpperCase()).join('') || 'U'
   function send(text: string) {
-    if(!text.trim() || !state) return
-    const reply=answerProjectQuestion(state,text,projectId,now)
-    setMessages(current=>[...current,{role:'user' as const,text:text.trim()},{role:'assistant' as const,...reply}].slice(-60))
+    if(!text.trim() || !state || thinking) return
+    const asked = text.trim()
+    const reply=answerProjectQuestion(state,asked,projectId,now)
+    setMessages(current=>[...current,{role:'user' as const,text:asked}].slice(-60))
     setQuestion('')
+    // Arc works through a few visible steps before answering, like a real agent would.
+    const steps = thinkingSteps(asked)
+    setThinking({ steps, index: 0 })
+    let elapsed = 0
+    steps.forEach((step, index) => {
+      elapsed += step.ms
+      timers.current.push(window.setTimeout(() => {
+        if (index < steps.length - 1) {
+          setThinking({ steps, index: index + 1 })
+        } else {
+          timers.current = []
+          setThinking(null)
+          setMessages(current=>[...current,{role:'assistant' as const,...reply}].slice(-60))
+        }
+      }, elapsed))
+    })
   }
   return <div className="page project-chat-page">
     <header className="chat-topbar">
@@ -140,6 +169,7 @@ function ChatSession() {
           </div>
           {m.role==='user' ? <span className="chat-user-avatar" aria-hidden>{initials}</span> : null}
         </article>)}
+        {thinking ? <ThinkingRow step={thinking.steps[thinking.index]} index={thinking.index} total={thinking.steps.length} /> : null}
       </div>
     </div>
 
@@ -152,7 +182,9 @@ function ChatSession() {
             <Layers aria-hidden />
             <SelectInput aria-label="Context" value={projectId} onChange={e=>setProjectId(e.target.value)}><option value="all">All projects</option>{state.projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</SelectInput>
           </span>
-          <button type="submit" className="btn btn-primary chat-send pressable" aria-label="Send question" disabled={!question.trim()}><ArrowUp aria-hidden/></button>
+          {thinking
+            ? <button type="button" className="btn btn-primary chat-send chat-stop pressable" aria-label="Stop thinking" onClick={stopThinking}><Square aria-hidden/></button>
+            : <button type="submit" className="btn btn-primary chat-send pressable" aria-label="Send question" disabled={!question.trim()}><ArrowUp aria-hidden/></button>}
         </div>
       </form>
       <p className="chat-disclaimer">{ASSISTANT} reads local workspace data only · No external AI connection · Infrastructure is simulated</p>
@@ -242,4 +274,57 @@ function ReplyBody({ text }: { text: string }) {
 
 function statusLabel(status: string): string {
   return status.replace(/^dns\b/, "DNS").replace(/^./, (first) => first.toUpperCase())
+}
+
+type ThinkingStep = { label: string; orb: OrbState; ms: number }
+
+/** The visible reasoning steps for a question — what Arc is looking at before it answers. */
+function thinkingSteps(question: string): ThinkingStep[] {
+  const q = question.toLowerCase()
+  const topic = /domain|dns|tls|certificate|ssl/.test(q) ? 'domains and DNS records'
+    : /container|running|restart|stopped/.test(q) ? 'containers on the server'
+    : /fail|error|attention|wrong|broken|alert/.test(q) ? 'recent failures and alerts'
+    : /server|cpu|memory|disk|resource|storage/.test(q) ? 'server resources'
+    : /deploy|release|build|commit/.test(q) ? 'recent deployments'
+    : 'your projects'
+  return [
+    { label: 'Reading your workspace', orb: 'searching', ms: 700 },
+    { label: `Checking ${topic}`, orb: 'working', ms: 900 },
+    { label: 'Writing the answer', orb: 'composing', ms: 800 },
+  ]
+}
+
+function ThinkingRow({ step, index, total }: { step: ThinkingStep; index: number; total: number }) {
+  const reduced = useReducedMotion()
+  return (
+    <motion.article
+      className="chat-message chat-message-assistant chat-thinking"
+      role="status"
+      aria-live="polite"
+      initial={reduced ? { opacity: 0 } : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: 'spring', bounce: 0, duration: 0.35 }}
+    >
+      <span className="chat-thinking-orb" aria-hidden>
+        <ThinkingOrb state={step.orb} size={64} theme="light" color="#5d5fef" paused={Boolean(reduced)} />
+      </span>
+      <div className="chat-thinking-pill">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span
+            key={step.label}
+            className="chat-thinking-label"
+            initial={reduced ? { opacity: 0 } : { opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduced ? { opacity: 0 } : { opacity: 0, y: -6 }}
+            transition={{ type: 'spring', bounce: 0, duration: 0.3 }}
+          >
+            {step.label}…
+          </motion.span>
+        </AnimatePresence>
+        <span className="chat-thinking-steps" aria-hidden>
+          {Array.from({ length: total }, (_, i) => <i key={i} data-state={i < index ? 'done' : i === index ? 'active' : 'todo'} />)}
+        </span>
+      </div>
+    </motion.article>
+  )
 }
