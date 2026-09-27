@@ -60,7 +60,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 type Stage = "choose" | "github" | "upload" | "git" | "image" | "compose" | "analyze" | "configure"
 const LANGUAGE_COLOR: Record<string, string> = { TypeScript: "#3178c6", JavaScript: "#f1e05a", Python: "#3572a5", HTML: "#e34c26", Go: "#00add8", Rust: "#dea584" }
-const REPO_PAGE = 5
+const REPO_PAGE = 7
 const SOURCE_STAGES: Stage[] = ["choose", "github", "upload", "git", "image", "compose"]
 
 export function NewProjectView({ source: routeSource }: { source?: string } = {}) {
@@ -424,18 +424,17 @@ export function NewProjectView({ source: routeSource }: { source?: string } = {}
                 })}
                 {shownRepos.length === 0 ? <li className="np-repo-empty">No repositories match “{repoQuery}”.</li> : null}
               </ul>
-              {filteredRepos.length > REPO_PAGE ? (
-                <div className="np-repo-pager">
-                  <span>Showing <strong>{currentRepoPage * REPO_PAGE + 1}–{Math.min(filteredRepos.length, (currentRepoPage + 1) * REPO_PAGE)}</strong> of {filteredRepos.length}</span>
-                  <span className="flex items-center gap-1">
-                    {Array.from({ length: repoPages }, (_, index) => (
-                      <button key={index} type="button" className="np-page-dot" aria-label={`Page ${index + 1}`} aria-current={index === currentRepoPage || undefined} onClick={() => setRepoPage(index)}>{index + 1}</button>
-                    ))}
-                    <button type="button" className="icon-btn" aria-label="Previous page" disabled={currentRepoPage === 0} onClick={() => setRepoPage(currentRepoPage - 1)}><ChevronLeft aria-hidden /></button>
-                    <button type="button" className="icon-btn" aria-label="Next page" disabled={currentRepoPage >= repoPages - 1} onClick={() => setRepoPage(currentRepoPage + 1)}><ChevronRight aria-hidden /></button>
-                  </span>
-                </div>
-              ) : null}
+              <div className="np-repo-pager">
+                <button type="button" className="np-repo-back" onClick={() => setStage("choose")}><ArrowRight aria-hidden className="rotate-180" />Other sources</button>
+                <span className="flex-1 text-center">Showing <strong>{filteredRepos.length ? currentRepoPage * REPO_PAGE + 1 : 0}–{Math.min(filteredRepos.length, (currentRepoPage + 1) * REPO_PAGE)}</strong> of {filteredRepos.length}</span>
+                <span className="flex items-center gap-1">
+                  {repoPages > 1 ? Array.from({ length: repoPages }, (_, index) => (
+                    <button key={index} type="button" className="np-page-dot" aria-label={`Page ${index + 1}`} aria-current={index === currentRepoPage || undefined} onClick={() => setRepoPage(index)}>{index + 1}</button>
+                  )) : null}
+                  <button type="button" className="icon-btn" aria-label="Previous page" disabled={currentRepoPage === 0} onClick={() => setRepoPage(currentRepoPage - 1)}><ChevronLeft aria-hidden /></button>
+                  <button type="button" className="icon-btn" aria-label="Next page" disabled={currentRepoPage >= repoPages - 1} onClick={() => setRepoPage(currentRepoPage + 1)}><ChevronRight aria-hidden /></button>
+                </span>
+              </div>
               <AnimatePresence initial={false}>
                 {repo ? (
                   <motion.div
@@ -478,7 +477,7 @@ export function NewProjectView({ source: routeSource }: { source?: string } = {}
               </AnimatePresence>
             </>
           )}
-          <Button className="mt-5 self-start" variant="ghost" onClick={() => setStage("choose")}><ArrowRight aria-hidden className="rotate-180" />Choose another source</Button>
+          {!state.github.connected ? <Button className="mt-5 self-start" variant="ghost" onClick={() => setStage("choose")}><ArrowRight aria-hidden className="rotate-180" />Choose another source</Button> : null}
         </section>
       ) : null}
 

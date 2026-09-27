@@ -1,5 +1,7 @@
 "use client"
 
+import { Server as ServerIcon } from "lucide-react"
+
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useState } from "react"
@@ -56,24 +58,31 @@ export function ServerDetail() {
   }
 
   return (
-    <div className="page page-wide">
-      <p className="page-kicker">Server</p>
-      <div className="page-introduction mt-2">
-        <div>
-          <h1 className="page-title">{server.name}</h1>
-          <div className="mt-2"><ServerStatusView value={server.status} /></div>
+    <div className="page page-wide page-stack">
+      <header className="page-introduction">
+        <div className="page-introduction-main">
+          <span className="page-introduction-icon"><ServerIcon aria-hidden /></span>
+          <div className="min-w-0">
+            <p className="page-kicker">Server</p>
+            <h1 className="page-title mt-1 font-heading">{server.name}<span className="text-brand">.</span></h1>
+            <p className="page-copy mt-2">{server.os} · {server.arch} · {server.ip}</p>
+            <div className="project-hero-meta"><ServerStatusView value={server.status} /></div>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => void run("refresh")}>Refresh status</Button>
-          <Link className="btn btn-ghost" href="/containers">View containers</Link>
-          <Link className="btn btn-ghost" href={`/logs`}>View logs</Link>
-          <Button variant="ghost" onClick={() => setConfirm("restart")}>Restart agent</Button>
-          {server.status === "offline" ? (
-            <Button variant="primary" onClick={() => void run("reconnect")}>Reconnect server</Button>
-          ) : (
-            <Button variant="danger" onClick={() => setConfirm("disconnect")}>Disconnect</Button>
-          )}
+        <div className="page-introduction-actions">
+          <Button variant="primary" onClick={() => void run("refresh")}>Refresh status</Button>
         </div>
+      </header>
+      <div className="intro-toolbar">
+        <Link className="btn btn-secondary btn-sm" href="/containers">View containers</Link>
+        <Link className="btn btn-secondary btn-sm" href={`/logs`}>View logs</Link>
+        <Button variant="ghost" size="sm" onClick={() => setConfirm("restart")}>Restart agent</Button>
+        <span className="flex-1" />
+        {server.status === "offline" ? (
+          <Button variant="primary" size="sm" onClick={() => void run("reconnect")}>Reconnect server</Button>
+        ) : (
+          <Button variant="danger" size="sm" onClick={() => setConfirm("disconnect")}>Disconnect</Button>
+        )}
       </div>
       {server.status === "offline" ? (
         <p className="mt-4 max-w-xl text-sm">

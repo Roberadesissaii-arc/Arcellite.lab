@@ -148,9 +148,9 @@ export function ContainersView() {
               </dl>
               <div className="dialog-actions">
                 <Link className="btn btn-ghost mr-auto" href={`/logs`}><ScrollText aria-hidden />Open logs</Link>
-                <Button variant="secondary" onClick={() => setConfirm({ id: selected.id, action: "restart" })}><RotateCcw aria-hidden />Restart</Button>
+                <Button variant="primary" onClick={() => setConfirm({ id: selected.id, action: "restart" })}><RotateCcw aria-hidden />Restart</Button>
                 {live ? (
-                  <Button variant="danger" onClick={() => setConfirm({ id: selected.id, action: "stop" })}><Square aria-hidden />Stop</Button>
+                  <Button variant="danger" className="btn-solid-danger" onClick={() => setConfirm({ id: selected.id, action: "stop" })}><Square aria-hidden />Stop</Button>
                 ) : (
                   <Button variant="primary" onClick={() => void act(selected, "start")}><Play aria-hidden />Start</Button>
                 )}

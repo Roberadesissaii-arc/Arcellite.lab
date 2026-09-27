@@ -183,6 +183,8 @@ export function ProjectsTable(props: ProjectsTableProps) {
       getRowId={(row) => row.id}
       onRowClick={(row) => onOpen(row.id)}
       initialSort={{ id: "updatedAt", desc: true }}
+      pageSize={7}
+      minRows={7}
     />
   )
 }

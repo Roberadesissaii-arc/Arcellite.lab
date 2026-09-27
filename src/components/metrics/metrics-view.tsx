@@ -61,14 +61,7 @@ export function MetricsView() {
         kicker="Observe"
         title="Metrics"
         description="Recent samples from the selected server. The series is deterministic demo telemetry."
-        actions={<>
-          {state.servers.length > 1 ? (
-            <SelectInput aria-label="Server" value={server.id} onChange={(event) => setServerId(event.target.value)} className="min-w-[200px]">
-              {state.servers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-            </SelectInput>
-          ) : <Tag tone="brand">{server.name}</Tag>}
-          <Button variant="secondary" onClick={() => void deploy.refreshServer(server.id).then(() => toast({ title: "Metrics refreshed", description: server.name }))}><RefreshCw aria-hidden />Refresh</Button>
-        </>}
+        actions={<Button variant="primary" onClick={() => void deploy.refreshServer(server.id).then(() => toast({ title: "Metrics refreshed", description: server.name }))}><RefreshCw aria-hidden />Refresh</Button>}
       />
       {!metrics.available ? (
         <EmptyPanel icon={Gauge} title="Telemetry paused" body={`${metrics.reason} Reconnect the server to see telemetry again.`} />
@@ -84,7 +77,11 @@ export function MetricsView() {
           <section>
             <SectionHeading
               title={`Last ${hours} hours`}
-              aside={<div className="segmented" role="group" aria-label="Time range">{RANGES.map((range) => <button key={range.hours} type="button" aria-pressed={hours === range.hours} onClick={() => setHours(range.hours)}>{range.label}</button>)}</div>}
+              aside={<div className="flex items-center gap-2">{state.servers.length > 1 ? (
+                <SelectInput aria-label="Server" value={server.id} onChange={(event) => setServerId(event.target.value)} className="min-w-[180px]">
+                  {state.servers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </SelectInput>
+              ) : null}<div className="segmented" role="group" aria-label="Time range">{RANGES.map((range) => <button key={range.hours} type="button" aria-pressed={hours === range.hours} onClick={() => setHours(range.hours)}>{range.label}</button>)}</div></div>}
             />
             <div className="card-grid">
               <Metric icon={Cpu} label="CPU" value={formatPercent(metrics.cpu)} series={slice(metrics.series.cpu)} format={formatPercent} />
