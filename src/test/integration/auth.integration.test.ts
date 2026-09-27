@@ -249,3 +249,19 @@ describe("errors", () => {
     }
   })
 })
+
+describe("configuration", () => {
+  it("refuses every API call while the master key is invalid", async () => {
+    const key = process.env.ARCELLITE_MASTER_KEY
+    process.env.ARCELLITE_MASTER_KEY = "a weak passphrase"
+    try {
+      const response = await call(routes.status.GET as RouteHandler, "/api/v1/auth/status")
+      expect(response.status).toBe(503)
+      const body = await json<{ error: { code: string; message: string } }>(response)
+      expect(body.error.code).toBe("SERVICE_UNAVAILABLE")
+      expect(body.error.message).not.toContain("ARCELLITE_MASTER_KEY")
+    } finally {
+      process.env.ARCELLITE_MASTER_KEY = key
+    }
+  })
+})

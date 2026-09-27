@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Lint, types, tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          # Throwaway credentials for the CI container only.
+          POSTGRES_USER: arcellite
+          POSTGRES_PASSWORD: arcellite-ci
+          POSTGRES_DB: arcellite_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U arcellite -d arcellite_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgres://arcellite:arcellite-ci@localhost:5432/arcellite_test
+      TEST_DATABASE_URL: postgres://arcellite:arcellite-ci@localhost:5432/arcellite_test
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Generate a temporary encryption key
+        run: |
+          key="$(openssl rand -base64 32)"
+          echo "::add-mask::$key"
+          echo "ARCELLITE_MASTER_KEY=$key" >> "$GITHUB_ENV"
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm db:migrate
+
+      - run: pnpm db:check
+
+      - run: pnpm lint
+
+      - run: pnpm typecheck
+
+      - run: pnpm test
+
+      - run: pnpm build
+
+      - name: Database integration tests
+        run: pnpm test:integration
+
+      - name: Install Chromium for smoke tests
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Browser smoke test (mock mode)
+        run: |
+          ARCELLITE_PROVIDER=mock pnpm start --port 3000 > mock.log 2>&1 &
+          pid=$!
+          for i in $(seq 1 60); do curl -fs http://localhost:3000/api/health/live > /dev/null && break; sleep 1; done
+          pnpm test:e2e --mode mock --base http://localhost:3000
+          kill "$pid"
+
+      - name: Browser smoke test (server mode)
+        run: |
+          psql "postgres://arcellite:arcellite-ci@localhost:5432/postgres" -c "create database arcellite_smoke"
+          export DATABASE_URL=postgres://arcellite:arcellite-ci@localhost:5432/arcellite_smoke
+          pnpm db:migrate
+          ARCELLITE_PROVIDER=server pnpm start --port 3001 > server.log 2>&1 &
+          pid=$!
+          for i in $(seq 1 60); do curl -fs http://localhost:3001/api/health/ready > /dev/null && break; sleep 1; done
+          pnpm test:e2e --mode server --base http://localhost:3001
+          kill "$pid"
+
+      - name: Server logs
+        if: failure()
+        run: cat mock.log server.log 2>/dev/null || true

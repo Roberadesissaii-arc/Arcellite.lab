@@ -6,7 +6,7 @@ import { CSRF_COOKIE, readCookie, SESSION_COOKIE } from "@/server/api/cookies"
 import { ApiFailure } from "@/server/api/failure"
 import type { Actor } from "@/server/auth/authorize"
 import { resolveSession, type SessionContext } from "@/server/auth/session"
-import { ConfigError, providerMode } from "@/server/config"
+import { ConfigError, databaseUrl, masterKeyring, providerMode } from "@/server/config"
 import { safeEqual, sha256Hex } from "@/server/crypto/tokens"
 import { db } from "@/server/db/client"
 import { log } from "@/server/security/log"
@@ -123,6 +123,9 @@ function baseContext<P>(request: Request, requestId: string, params: P): RouteCo
 
 function guard(request: Request) {
   if (providerMode() !== "server") throw new ApiFailure("FEATURE_NOT_AVAILABLE", "The control plane API runs only when ARCELLITE_PROVIDER=server.")
+  // A half-configured control plane refuses everything rather than accept accounts it cannot protect.
+  databaseUrl()
+  masterKeyring()
   if (!SAFE_METHODS.has(request.method) && !isTrustedOrigin(request)) {
     throw new ApiFailure("CSRF_FAILED", "This request did not come from Arcellite Deploy.")
   }
