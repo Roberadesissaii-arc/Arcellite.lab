@@ -15,8 +15,7 @@ import { ServerStatusView, ContainerStatusView } from "@/components/ui/status"
 import { useToast } from "@/components/ui/toast"
 import { Sparkline } from "@/components/ui/bits"
 import { formatGb, formatPercent, formatUptime } from "@/lib/deploy/format"
-import { serverMetrics } from "@/lib/deploy/helpers"
-import { useDeploy, useDeployState } from "@/lib/deploy/react"
+import { useDeploy, useDeployState, useServerMetrics } from "@/lib/deploy/react"
 import { DeployError } from "@/lib/deploy/types"
 import { useNow } from "@/lib/use-now"
 
@@ -32,11 +31,11 @@ export function ServerDetail() {
   const [tab, setTab] = useState<(typeof TABS)[number]>("Overview")
   const [confirm, setConfirm] = useState<"restart" | "disconnect" | null>(null)
   const server = state?.servers.find((item) => item.id === params.serverId)
+  const metrics = useServerMetrics(server?.id)
   if (!state) return <PageSkeleton variant="detail" />
-  if (!server) {
+  if (!server || !metrics) {
     return <div className="page"><h1 className="page-title">Server not found</h1></div>
   }
-  const metrics = serverMetrics(server, state)
   const containers = state.containers.filter((item) => item.serverId === server.id)
   const volumes = state.volumes.filter((item) => item.serverId === server.id)
   const activity = state.activity.filter((item) => item.objectName === server.name || item.href?.includes(server.id))

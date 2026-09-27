@@ -5,15 +5,15 @@ import { PageHeader } from "@/components/page-header"
 import { LogStream } from "@/components/logs/log-stream"
 import { PageSkeleton } from "@/components/ui/bits"
 import { StatCard, StatGrid } from "@/components/ui/kit"
-import { collectLogs } from "@/lib/deploy/logs"
-import { useDeployState } from "@/lib/deploy/react"
+import { useDeployState, useLogs } from "@/lib/deploy/react"
 import { useNow } from "@/lib/use-now"
 
 export function LogsView() {
   const state = useDeployState()
-  const now = useNow(5000)
+  // Refresh the counts on this interval; the provider decides which lines exist.
+  useNow(5000)
+  const lines = useLogs({ target: "all", level: "all", search: "" })
   if (!state) return <PageSkeleton />
-  const lines = collectLogs(state, { target: "all", level: "all", search: "" }, now)
   const warnings = lines.filter((line) => line.level === "warn").length
   const errors = lines.filter((line) => line.level === "error").length
   const sources = state.projects.length + state.containers.length + state.servers.length

@@ -1,60 +1,45 @@
+import type {
+  CONTAINER_STATES,
+  DEPLOYMENT_PHASES,
+  DEPLOYMENT_STATUSES,
+  DOMAIN_KINDS,
+  DOMAIN_STATUSES,
+  ENVIRONMENT_NAMES,
+  FRAMEWORKS,
+  LOG_LEVELS,
+  RESTART_POLICIES,
+  SERVER_STATUSES,
+  STEP_STATUSES,
+} from "@/lib/api/contracts/common"
+import type { ApiErrorCode } from "@/lib/api/contracts/error"
+
 export const SCHEMA_VERSION = 1
 
-export type Framework =
-  | "nextjs"
-  | "vite"
-  | "node"
-  | "express"
-  | "fastapi"
-  | "flask"
-  | "static"
-  | "dockerfile"
-  | "compose"
-  | "unknown"
+// Unions derive from the wire vocabulary so the mock model and the DTO schemas cannot drift.
+export type Framework = (typeof FRAMEWORKS)[number]
 
-export type EnvironmentName = "production" | "preview" | "development"
+export type EnvironmentName = (typeof ENVIRONMENT_NAMES)[number]
 
-export type DeploymentStatus =
-  | "queued"
-  | "preparing"
-  | "building"
-  | "deploying"
-  | "ready"
-  | "failed"
-  | "canceled"
-  | "stopped"
+export type DeploymentStatus = (typeof DEPLOYMENT_STATUSES)[number]
 
-export type DeploymentPhase =
-  | "queued"
-  | "preparing"
-  | "installing"
-  | "building"
-  | "creating-image"
-  | "starting"
-  | "health-check"
-  | "ready"
+export type DeploymentPhase = (typeof DEPLOYMENT_PHASES)[number]
 
-export type StepStatus = "pending" | "active" | "completed" | "failed" | "canceled"
+export type StepStatus = (typeof STEP_STATUSES)[number]
 
-export type RestartPolicy = "unless-stopped" | "on-failure" | "always" | "no"
+export type RestartPolicy = (typeof RESTART_POLICIES)[number]
 
-export type ServerStatus = "online" | "degraded" | "offline"
+export type ServerStatus = (typeof SERVER_STATUSES)[number]
 
-export type ContainerState = "running" | "starting" | "restarting" | "stopped" | "exited"
+export type ContainerState = (typeof CONTAINER_STATES)[number]
 
-export type DomainKind = "local" | "private" | "public"
+export type DomainKind = (typeof DOMAIN_KINDS)[number]
 
-export type DomainStatus =
-  | "active"
-  | "pending"
-  | "invalid"
-  | "dns-required"
-  | "verifying"
-  | "issuing"
+export type DomainStatus = (typeof DOMAIN_STATUSES)[number]
 
+// Mock-only: "simulated-active" has no wire equivalent; DomainDTO reports tls.simulated instead.
 export type SslState = "none" | "pending" | "simulated-active" | "failed"
 
-export type LogLevel = "info" | "warn" | "error" | "debug"
+export type LogLevel = (typeof LOG_LEVELS)[number]
 
 export type ThemeChoice = "light" | "dark" | "system"
 
@@ -137,6 +122,7 @@ export interface Project {
   createdAt: string
   updatedAt: string
   runtime: "running" | "stopped"
+  // Mock-only: set through provider.dev; never part of ProjectDTO.
   simulateFailure: boolean
   env: EnvironmentVariable[]
   liveDeploymentId: string | null
@@ -171,6 +157,7 @@ export interface Deployment {
   startedAt: string
   finishedAt: string | null
   triggeredBy: string
+  // Mock-only: the phase a simulated failure stops at.
   failAt: DeploymentPhase | null
   previousRelease: boolean
   error: DeploymentError | null
@@ -200,6 +187,7 @@ export interface Server {
   agentVersion: string
   agentStatus: "connected" | "offline"
   startedAt: string
+  // Mock-only: phase of the synthetic metric wave.
   sampleShift: number
   refreshedAt: string | null
 }
@@ -406,7 +394,6 @@ export interface CreateProjectInput {
   memoryLimitMb: number | null
   restartPolicy: RestartPolicy
   env: EnvironmentVariable[]
-  simulateFailure?: boolean
 }
 
 export type ProjectPatch = Partial<
@@ -431,7 +418,6 @@ export type ProjectPatch = Partial<
     | "memoryLimitMb"
     | "restartPolicy"
     | "env"
-    | "simulateFailure"
     | "hostname"
   >
 >
@@ -467,16 +453,49 @@ export interface LogQuery {
   id?: string
   level?: LogLevel | "all"
   search?: string
+  // Accepted for a future paged stream; the mock returns every matching line.
+  cursor?: string
+  limit?: number
+  since?: string
+  until?: string
+  category?: "build" | "runtime" | "system"
 }
 
+export type Health = "up" | "degraded" | "down"
+export type HealthDayState = Health | "none"
+
+/** A project's service health and daily history, as reported by the provider. */
+export interface ProjectHealth {
+  projectId: string
+  health: Health
+  label: string
+  detail: string
+  uptime: number | null
+  days: { start: number; state: HealthDayState; note: string }[]
+}
+
+/**
+ * The error every provider rejects with. `title` and `detail` are what the UI shows today;
+ * `code` is the stable identity a server provider maps from its ApiError response.
+ */
 export class DeployError extends Error {
   readonly title: string
   readonly detail: string
+  readonly code: ApiErrorCode
+  readonly requestId: string | undefined
+  readonly details: Record<string, unknown> | undefined
 
-  constructor(title: string, detail: string) {
+  constructor(
+    title: string,
+    detail: string,
+    options: { code?: ApiErrorCode; requestId?: string; details?: Record<string, unknown> } = {},
+  ) {
     super(detail)
     this.name = "DeployError"
     this.title = title
     this.detail = detail
+    this.code = options.code ?? "INTERNAL_ERROR"
+    this.requestId = options.requestId
+    this.details = options.details
   }
 }

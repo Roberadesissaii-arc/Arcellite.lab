@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useState } from "react"
 import { PageHeader } from "@/components/page-header"
 import { mapProjectsToTableRows, ProjectsTable } from "@/components/projects/projects-table"
 import { Button } from "@/components/ui/button"
@@ -12,7 +12,7 @@ import { ConfirmDialog } from "@/components/ui/overlays"
 import { useToast } from "@/components/ui/toast"
 import { filterProjects, type ProjectSort } from "@/lib/deploy/filters"
 import { DeployError } from "@/lib/deploy/types"
-import { latestDeployment, projectBadge } from "@/lib/deploy/helpers"
+import { projectBadge } from "@/lib/deploy/helpers"
 import { useDeploy, useDeployState } from "@/lib/deploy/react"
 import { useNow } from "@/lib/use-now"
 import type { AppState, DeploymentStatus, EnvironmentName, Project } from "@/lib/deploy/types"
@@ -30,26 +30,25 @@ export function ProjectsView() {
   const [sort, setSort] = useState<ProjectSort>("recent")
   const [pendingDelete, setPendingDelete] = useState<Project | null>(null)
 
-  const rows = useMemo(() => {
-    if (!state) return []
-    return filterProjects(state.projects, (project) => projectBadge(project, latestDeployment(state.deployments, project.id, now)), {
-      search,
-      environment,
-      status,
-      sort,
-    })
-  }, [state, search, environment, status, sort, now])
+  // Recomputed each render (the clock ticks) so status badges follow in-flight deployments.
+  const rows = state
+    ? filterProjects(state.projects, (project) => projectBadge(project, deploy.latestDeployment(project.id)), {
+        search,
+        environment,
+        status,
+        sort,
+      })
+    : []
 
   const serverIp = state?.servers[0]?.ip
 
-  const tableRows = useMemo(() => {
-    if (!state) return []
-    return mapProjectsToTableRows(rows, {
-      now,
-      serverIp,
-      badgeFor: (project) => projectBadge(project, latestDeployment(state.deployments, project.id, now)),
-    })
-  }, [state, rows, now, serverIp])
+  const tableRows = state
+    ? mapProjectsToTableRows(rows, {
+        now,
+        serverIp,
+        badgeFor: (project) => projectBadge(project, deploy.latestDeployment(project.id)),
+      })
+    : []
 
   const handleOpen = useCallback((projectId: string) => {
     router.push(`/projects/${projectId}`)
@@ -168,8 +167,9 @@ export function ProjectsView() {
 }
 
 function ProjectStats({ state }: { state: AppState }) {
-  const now = useNow()
-  const badges = state.projects.map((project) => projectBadge(project, latestDeployment(state.deployments, project.id, now)))
+  const deploy = useDeploy()
+  useNow()
+  const badges = state.projects.map((project) => projectBadge(project, deploy.latestDeployment(project.id)))
   const ready = badges.filter((badge) => badge === "ready").length
   const failed = badges.filter((badge) => badge === "failed").length
   const production = state.projects.filter((project) => project.environment === "production").length

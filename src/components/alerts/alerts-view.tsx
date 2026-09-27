@@ -11,9 +11,9 @@ import { PageHeader } from "@/components/page-header"
 import { PageSkeleton } from "@/components/ui/bits"
 import { StatCard, StatGrid, Tag } from "@/components/ui/kit"
 import { formatRelative } from "@/lib/deploy/format"
-import { homeServer, latestDeployment, projectBadge } from "@/lib/deploy/helpers"
-import { useDeployState } from "@/lib/deploy/react"
-import type { AppState } from "@/lib/deploy/types"
+import { homeServer, projectBadge } from "@/lib/deploy/helpers"
+import { useDeploy, useDeployState } from "@/lib/deploy/react"
+import type { AppState, Deployment } from "@/lib/deploy/types"
 import { useNow } from "@/lib/use-now"
 
 type Severity = "critical" | "warning" | "info"
@@ -43,7 +43,7 @@ const SEVERITY: Record<Severity, { label: string; icon: LucideIcon; order: numbe
   info: { label: "Info", icon: Info, order: 2 },
 }
 
-function collect(state: AppState, now: number): { alerts: Alert[]; checks: Check[] } {
+function collect(state: AppState, latestOf: (projectId: string) => Deployment | null): { alerts: Alert[]; checks: Check[] } {
   const alerts: Alert[] = []
   const server = homeServer(state)
   if (server?.status === "offline") {
@@ -52,7 +52,7 @@ function collect(state: AppState, now: number): { alerts: Alert[]; checks: Check
     alerts.push({ id: "server-degraded", severity: "warning", icon: Unplug, title: "Server degraded", body: `${server.name} is reporting, but slowly. Check the agent.`, source: server.name, href: `/servers/${server.id}`, action: "Open server", since: server.refreshedAt })
   }
   const failed = state.projects.flatMap((project) => {
-    const latest = latestDeployment(state.deployments, project.id, now)
+    const latest = latestOf(project.id)
     return projectBadge(project, latest) === "failed" ? [{ project, latest }] : []
   })
   for (const { project, latest } of failed) {
@@ -95,10 +95,11 @@ function collect(state: AppState, now: number): { alerts: Alert[]; checks: Check
 export function AlertsView() {
   const state = useDeployState()
   const now = useNow()
+  const deploy = useDeploy()
   const [filter, setFilter] = useState<Severity | "all">("all")
   const [acknowledged, setAcknowledged] = useState<string[]>([])
   if (!state) return <PageSkeleton />
-  const { alerts, checks } = collect(state, now)
+  const { alerts, checks } = collect(state, (projectId) => deploy.latestDeployment(projectId))
   const open = alerts.filter((alert) => !acknowledged.includes(alert.id))
   const acked = alerts.filter((alert) => acknowledged.includes(alert.id))
   const shown = open.filter((alert) => filter === "all" || alert.severity === filter)

@@ -9,8 +9,8 @@ import { PageSkeleton } from "@/components/ui/bits"
 import { FRAMEWORKS } from "@/lib/deploy/detect"
 import { formatGb, formatRelative, formatUptime, greeting } from "@/lib/deploy/format"
 import { ReleaseChart } from "@/components/overview/release-chart"
-import { homeServer, latestDeployment, projectBadge, sourceText } from "@/lib/deploy/helpers"
-import { useDeployState } from "@/lib/deploy/react"
+import { homeServer, projectBadge, sourceText } from "@/lib/deploy/helpers"
+import { useDeploy, useDeployState } from "@/lib/deploy/react"
 import { useNow } from "@/lib/use-now"
 
 function SectionHeading({ title, href, action = "View all" }: { title: string; href: string; action?: string }) {
@@ -20,17 +20,18 @@ function SectionHeading({ title, href, action = "View all" }: { title: string; h
 export function OverviewView() {
   const state = useDeployState()
   const now = useNow(15000)
+  const deploy = useDeploy()
   if (!state) return <PageSkeleton variant="overview" />
   const server = homeServer(state)
   const projects = [...state.projects].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
   const activity = state.activity.slice(0, 5)
   const inFlight = state.deployments.filter((item) => !["ready", "failed", "canceled", "stopped"].includes(item.status))
-  const failed = projects.filter((project) => projectBadge(project, latestDeployment(state.deployments, project.id, now)) === "failed")
+  const failed = projects.filter((project) => projectBadge(project, deploy.latestDeployment(project.id)) === "failed")
   const waiting = state.domains.filter((domain) => domain.status === "dns-required" || domain.status === "invalid")
   const headline = !server || server.status === "offline" ? "Server unavailable." : failed.length
     ? "A deployment needs attention." : inFlight.length ? "A deployment is in progress." : "Infrastructure is healthy."
 
-  const running = projects.filter(project => projectBadge(project, latestDeployment(state.deployments, project.id, now)) === "ready").length
+  const running = projects.filter(project => projectBadge(project, deploy.latestDeployment(project.id)) === "ready").length
   const successes = state.activity.filter((event) => event.result === "success").length
   const problems = state.activity.filter((event) => event.result === "warning" || event.result === "error").length
   const readyReleases = state.deployments.filter((item) => item.status === "ready").length
@@ -74,7 +75,7 @@ export function OverviewView() {
         <div className="panel">
           {
             <ul className="panel-list overview-project-list">{projects.slice(0, 4).map((project) => {
-              const latest = latestDeployment(state.deployments, project.id, now)
+              const latest = deploy.latestDeployment(project.id)
               return <li key={project.id}><Link href={`/projects/${project.id}`} className="overview-project">
                 <span className="project-identity"><span className="framework-mark">{project.framework === "fastapi" ? <Zap aria-hidden /> : <Code2 aria-hidden />}</span><span className="min-w-0"><strong>{project.name}</strong><small>{sourceText(project)}</small></span></span>
                 <span className="project-environment capitalize text-muted">{project.environment}</span>

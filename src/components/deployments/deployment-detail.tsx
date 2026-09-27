@@ -8,10 +8,10 @@ import { Button } from "@/components/ui/button"
 import { copyText, EmptyState, PageSkeleton } from "@/components/ui/bits"
 import { useToast } from "@/components/ui/toast"
 import { LogStream } from "@/components/logs/log-stream"
-import { deploymentFraction, materializeDeployment } from "@/lib/deploy/engine"
 import { formatClock, formatDuration, formatRelative } from "@/lib/deploy/format"
 import { projectEndpoint } from "@/lib/deploy/helpers"
-import { useDeploy, useDeployState } from "@/lib/deploy/react"
+import { useDeploy, useDeployment, useDeploymentProgress, useDeployState } from "@/lib/deploy/react"
+import { isTerminalStatus } from "@/lib/deploy/status"
 import { DeployError } from "@/lib/deploy/types"
 import { useNow } from "@/lib/use-now"
 import { DeploymentStatusView } from "@/components/ui/status"
@@ -22,26 +22,27 @@ export function DeploymentDetail() {
   const deploy = useDeploy()
   const toast = useToast()
   const router = useRouter()
-  const stored = state?.deployments.find((item) => item.id === params.deploymentId)
-  const live = stored ? !stored.finishedAt && stored.status !== "canceled" && stored.status !== "failed" && stored.status !== "stopped" : false
+  // The provider decides the deployment's state; the page's clock only formats durations.
+  const view = useDeployment(params.deploymentId)
+  const fraction = useDeploymentProgress(params.deploymentId)
+  const live = view ? !view.finishedAt && !isTerminalStatus(view.status) : false
   const now = useNow(live ? 200 : 30000)
   const [busy, setBusy] = useState<"cancel" | "redeploy" | null>(null)
+  const commitSha = view?.commitSha
 
   useEffect(() => {
-    if (stored) document.title = `Deployment ${stored.commitSha} · Arcellite Deploy`
-  }, [stored])
+    if (commitSha) document.title = `Deployment ${commitSha} · Arcellite Deploy`
+  }, [commitSha])
 
   if (!state) return <PageSkeleton variant="detail" />
-  if (!stored) {
+  if (!view) {
     return (
       <div className="page">
         <EmptyState title="Deployment not found" body="This release is not in the current workspace." />
       </div>
     )
   }
-  const view = materializeDeployment(stored, now)
-  const project = state.projects.find((item) => item.id === stored.projectId)
-  const fraction = deploymentFraction(view, now)
+  const project = state.projects.find((item) => item.id === view.projectId)
   const endpoint = project ? projectEndpoint(project, state.servers[0]?.ip) : ""
   const sourceUrl = project?.source.type === "github" ? `https://github.com/${project.source.fullName}/commit/${view.commitSha}` : null
   const terminal = view.status === "ready" || view.status === "failed" || view.status === "canceled" || view.status === "stopped"
@@ -53,7 +54,7 @@ export function DeploymentDetail() {
 
   function cancel() {
     setBusy("cancel")
-    void deploy.cancelDeployment(view.id).then(
+    void deploy.cancelDeployment(params.deploymentId).then(
       () => {
         toast({ title: "Deployment canceled" })
         setBusy(null)

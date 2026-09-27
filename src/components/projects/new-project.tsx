@@ -258,8 +258,8 @@ export function NewProjectView({ source: routeSource }: { source?: string } = {}
         memoryLimitMb: parsed.data.memoryLimitMb ? Number(parsed.data.memoryLimitMb) : null,
         restartPolicy: parsed.data.restartPolicy,
         env: env.filter((item) => item.key.trim()),
-        simulateFailure: parsed.data.simulateFailure,
       })
+      if (parsed.data.simulateFailure && deploy.dev) await deploy.dev.setSimulateFailure(project.id, true)
       const deployment = await deploy.startDeployment(project.id)
       router.push(`/deployments/${deployment.id}`)
     } catch (error) {
@@ -776,11 +776,13 @@ export function NewProjectView({ source: routeSource }: { source?: string } = {}
                     <option value="no">no</option>
                   </SelectInput>
                 </Field>
-                <label className="npc-switch self-end">
-                  <input type="checkbox" className="sr-only" {...form.register("simulateFailure")} />
-                  <span className="toggle" aria-hidden><span /></span>
-                  <span><strong>Simulate a failed build</strong><small>For testing alerts.</small></span>
-                </label>
+                {deploy.dev ? (
+                  <label className="npc-switch self-end">
+                    <input type="checkbox" className="sr-only" {...form.register("simulateFailure")} />
+                    <span className="toggle" aria-hidden><span /></span>
+                    <span><strong>Simulate a failed build</strong><small>For testing alerts.</small></span>
+                  </label>
+                ) : null}
               </div>
             ) : null}
           </section>

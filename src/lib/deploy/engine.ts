@@ -6,6 +6,9 @@ import type {
   DeploymentStep,
   Project,
 } from "./types"
+import { isTerminalStatus } from "./status"
+
+export { isTerminalStatus }
 
 export interface PhaseDef {
   phase: Exclude<DeploymentPhase, "ready">
@@ -29,10 +32,6 @@ export const FAIL_RATIO = 0.75
 
 export function totalDurationMs(): number {
   return PIPELINE.reduce((sum, phase) => sum + phase.ms, 0)
-}
-
-export function isTerminalStatus(status: DeploymentStatus): boolean {
-  return status === "ready" || status === "failed" || status === "canceled" || status === "stopped"
 }
 
 export function isTerminal(dep: Deployment): boolean {
