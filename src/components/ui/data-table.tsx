@@ -81,6 +81,7 @@ export function DataTable<T extends RowData>({
   className,
   label,
   noun = "results",
+  minRows = 0,
 }: {
   columns: DataColumn<T>[]
   data: T[]
@@ -91,6 +92,8 @@ export function DataTable<T extends RowData>({
   className?: string
   label: string
   noun?: string
+  /** Keep the table at least this many rows tall, filling the gap with quiet placeholder rows. */
+  minRows?: number
 }) {
   const table = useTable(
     {
@@ -165,6 +168,11 @@ export function DataTable<T extends RowData>({
                 <td className="py-10 text-center text-muted" colSpan={columns.length}>No results.</td>
               </tr>
             )}
+            {Array.from({ length: Math.max(0, minRows - Math.max(1, table.getRowModel().rows.length)) }, (_, index) => (
+              <tr key={`placeholder-${index}`} className="data-table-placeholder" aria-hidden>
+                <td colSpan={columns.length}><span /></td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

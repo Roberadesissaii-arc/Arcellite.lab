@@ -31,10 +31,13 @@ export function LogStream({
   target,
   id,
   allowTarget = false,
+  insights = false,
 }: {
   target: LogQuery["target"]
   id?: string
   allowTarget?: boolean
+  /** Show a volume chart and the busiest sources between the filters and the terminal. */
+  insights?: boolean
 }) {
   const state = useDeployState()
   const now = useNow(1000)
@@ -95,6 +98,8 @@ export function LogStream({
           ))}
         </div>
       </div>
+
+      {insights ? <LogInsights rows={everything} chosen={chosen} onChoose={setChosen} /> : null}
 
       <div className="log-window">
         <div className="log-window-bar">
@@ -185,6 +190,75 @@ export function LogStream({
           {paused ? <span className="ml-auto">New lines are held until you resume.</span> : <span className="ml-auto">{follow ? "Following the newest line" : "Scroll lock on"}</span>}
         </div>
       </div>
+    </div>
+  )
+}
+
+const LEVEL_ORDER: LogLevel[] = ["error", "warn", "info", "debug"]
+
+/** Volume over the window, stacked by level, plus the sources writing the most lines. */
+function LogInsights({ rows, chosen, onChoose }: { rows: LogEntry[]; chosen: string; onChoose: (value: string) => void }) {
+  const state = useDeployState()
+  if (!state || !rows.length) return null
+  const times = rows.map((row) => Date.parse(row.timestamp))
+  const start = Math.min(...times)
+  const end = Math.max(...times) + 1
+  const BUCKETS = 36
+  const span = (end - start) / BUCKETS
+  const buckets = Array.from({ length: BUCKETS }, () => ({ error: 0, warn: 0, info: 0, debug: 0, total: 0 }))
+  for (const row of rows) {
+    const index = Math.min(BUCKETS - 1, Math.floor((Date.parse(row.timestamp) - start) / span))
+    buckets[index][row.level] += 1
+    buckets[index].total += 1
+  }
+  const peak = Math.max(1, ...buckets.map((bucket) => bucket.total))
+  const nameOf = (row: LogEntry) => {
+    if (row.targetType === "project") return { key: `project:${row.targetId}`, name: state.projects.find((item) => item.id === row.targetId)?.name ?? row.targetId, kind: "Project" }
+    if (row.targetType === "container") return { key: `container:${row.targetId}`, name: state.containers.find((item) => item.id === row.targetId)?.name ?? row.targetId, kind: "Container" }
+    if (row.targetType === "server") return { key: `server:${row.targetId}`, name: state.servers.find((item) => item.id === row.targetId)?.name ?? row.targetId, kind: "Server" }
+    const project = state.projects.find((item) => item.id === row.projectId)
+    return project ? { key: `project:${project.id}`, name: project.name, kind: "Project" } : null
+  }
+  const sources = new Map<string, { name: string; kind: string; count: number; problems: number }>()
+  for (const row of rows) {
+    const source = nameOf(row)
+    if (!source) continue
+    const entry = sources.get(source.key) ?? { name: source.name, kind: source.kind, count: 0, problems: 0 }
+    entry.count += 1
+    if (row.level === "warn" || row.level === "error") entry.problems += 1
+    sources.set(source.key, entry)
+  }
+  const top = [...sources.entries()].sort((a, b) => b[1].count - a[1].count).slice(0, 5)
+  const topCount = top[0]?.[1].count ?? 1
+  return (
+    <div className="log-insights">
+      <section className="log-volume">
+        <header>
+          <p>Log volume</p>
+          <span>{formatClock(new Date(start).toISOString())} – {formatClock(new Date(end).toISOString())}</span>
+        </header>
+        <div className="log-volume-bars" role="img" aria-label={`${rows.length} lines over the window`}>
+          {buckets.map((bucket, index) => (
+            <span key={index} style={{ height: `${Math.max(4, (bucket.total / peak) * 100)}%` }} title={`${bucket.total} lines`}>
+              {LEVEL_ORDER.map((levelKey) => bucket[levelKey] ? <i key={levelKey} data-level={levelKey} style={{ flexGrow: bucket[levelKey] }} /> : null)}
+            </span>
+          ))}
+        </div>
+      </section>
+      <section className="log-sources">
+        <header><p>Busiest sources</p>{chosen !== "all:" ? <button type="button" onClick={() => onChoose("all:")}>Show all</button> : null}</header>
+        <ul>
+          {top.map(([key, source]) => (
+            <li key={key}>
+              <button type="button" data-active={chosen === key || undefined} onClick={() => onChoose(chosen === key ? "all:" : key)}>
+                <span className="log-source-name"><strong>{source.name}</strong><small>{source.kind}</small></span>
+                <span className="log-source-bar" aria-hidden><i style={{ width: `${(source.count / topCount) * 100}%` }} /></span>
+                <span className="log-source-count">{source.count}{source.problems ? <em>{source.problems}!</em> : null}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   )
 }

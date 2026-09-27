@@ -26,7 +26,7 @@ export function LogsView() {
         <StatCard icon={CircleAlert} tone={errors ? "danger" : "success"} label="Errors" value={errors} detail={errors ? "Check the red lines" : "No errors"} />
         <StatCard icon={Radio} tone="info" label="Sources" value={sources} detail="Projects, containers, servers" />
       </StatGrid>
-      <LogStream target="all" allowTarget />
+      <LogStream target="all" allowTarget insights />
     </div>
   )
 }

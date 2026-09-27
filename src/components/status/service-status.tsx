@@ -115,7 +115,7 @@ export function ServiceStatusBoard({ state, now }: { state: AppState; now: numbe
             <UptimeBars days={row.days} label={row.project.name} />
             <div className="status-board-side">
               <HealthPill health={row.health} label={row.label} />
-              <small>{row.uptime === null ? "—" : `${row.uptime.toFixed(row.uptime === 100 ? 0 : 1)}% uptime`}</small>
+              <span className="status-board-uptime"><strong>{row.uptime === null ? "—" : `${row.uptime.toFixed(row.uptime === 100 ? 0 : 1)}%`}</strong>uptime</span>
             </div>
           </li>
         ))}

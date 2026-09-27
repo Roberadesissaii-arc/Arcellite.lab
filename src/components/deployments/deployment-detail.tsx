@@ -95,8 +95,6 @@ export function DeploymentDetail() {
           </div>
         </div>
         <div className="page-introduction-actions">
-          <Button variant="ghost" onClick={() => void copyText(view.id).then((ok) => toast(ok ? { title: "Deployment ID copied" } : { title: "Could not copy", tone: "danger" }))}><Copy aria-hidden />Copy ID</Button>
-          {sourceUrl ? <a className="btn btn-secondary" href={sourceUrl} target="_blank" rel="noreferrer">Commit<ExternalLink aria-hidden /></a> : null}
           {!terminal ? (
             <Button variant="danger" loading={busy === "cancel"} onClick={cancel}><X aria-hidden />Cancel</Button>
           ) : project ? (
@@ -157,6 +155,14 @@ export function DeploymentDetail() {
           <dl className="dd-facts">
             <div><dt>Branch</dt><dd>{view.branch ?? "upload"}</dd></div>
             <div><dt>Duration</dt><dd>{formatDuration(duration)}</dd></div>
+            <div>
+              <dt>Deployment ID</dt>
+              <dd className="dd-fact-action"><span className="truncate">{view.id}</span><button type="button" className="icon-btn" aria-label="Copy deployment ID" onClick={() => void copyText(view.id).then((ok) => toast(ok ? { title: "Deployment ID copied" } : { title: "Could not copy", tone: "danger" }))}><Copy aria-hidden /></button></dd>
+            </div>
+            <div>
+              <dt>Commit</dt>
+              <dd className="dd-fact-action"><span className="truncate">{view.commitSha}</span>{sourceUrl ? <a className="icon-btn" href={sourceUrl} target="_blank" rel="noreferrer" aria-label="Open commit"><ExternalLink aria-hidden /></a> : null}</dd>
+            </div>
           </dl>
         </section>
         <section className="dd-logs">

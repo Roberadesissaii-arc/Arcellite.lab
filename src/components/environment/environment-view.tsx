@@ -86,21 +86,6 @@ export function EnvironmentView() {
         description="Variables and secrets for every project, kept apart from source code. Secrets stay masked and are injected only when a container starts."
         actions={project ? (
           <>
-            <input ref={fileRef} type="file" accept=".env,.txt,text/plain" className="sr-only" tabIndex={-1} aria-hidden onChange={(event) => {
-              const file = event.target.files?.[0]
-              event.target.value = ""
-              if (!file) return
-              void file.text().then((text) => {
-                const parsed = parseDotenv(text)
-                if (!parsed.entries.length) {
-                  toast({ title: "Nothing to import", description: `${file.name} has no KEY=VALUE lines.` })
-                  return
-                }
-                setError(null)
-                setImporting({ file: file.name, skipped: parsed.skipped, scope: "all", rows: parsed.entries.map((entry) => ({ key: entry.key, value: entry.value, secret: looksSecret(entry.key), include: true })) })
-              })
-            }} />
-            <Button variant="secondary" onClick={() => fileRef.current?.click()}><FileUp aria-hidden />Upload .env</Button>
             <Button variant="primary" onClick={() => { setError(null); setDraft({ key: "", value: "", scope: "all", secret: true }); setAdding(true) }}><Plus aria-hidden />Add variable</Button>
           </>
         ) : null}
@@ -116,7 +101,21 @@ export function EnvironmentView() {
         <EmptyPanel icon={KeyRound} title="No projects yet" body="Create a project to give it environment variables." action={<Link href="/projects/new" className="btn btn-primary">New project</Link>} />
       ) : (
         <section>
-        <SectionHeading title="Variables" aside={<span className="text-xs text-faint">Filters apply to the selected project</span>} />
+        <SectionHeading title="Variables" aside={<span className="flex items-center gap-3"><span className="text-xs text-faint">Filters apply to the selected project</span><Button variant="secondary" size="sm" onClick={() => fileRef.current?.click()}><FileUp aria-hidden />Upload .env</Button></span>} />
+            <input ref={fileRef} type="file" accept=".env,.txt,text/plain" className="sr-only" tabIndex={-1} aria-hidden onChange={(event) => {
+              const file = event.target.files?.[0]
+              event.target.value = ""
+              if (!file) return
+              void file.text().then((text) => {
+                const parsed = parseDotenv(text)
+                if (!parsed.entries.length) {
+                  toast({ title: "Nothing to import", description: `${file.name} has no KEY=VALUE lines.` })
+                  return
+                }
+                setError(null)
+                setImporting({ file: file.name, skipped: parsed.skipped, scope: "all", rows: parsed.entries.map((entry) => ({ key: entry.key, value: entry.value, secret: looksSecret(entry.key), include: true })) })
+              })
+            }} />
         <div className="page-toolbar mb-3">
           <SearchField value={search} onChange={(value) => { setSearch(value); setPage(0) }} placeholder="Search keys" label="Search variables" />
           <div className="segmented" role="group" aria-label="Filter by scope">
