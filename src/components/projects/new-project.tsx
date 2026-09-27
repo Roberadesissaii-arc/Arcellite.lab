@@ -832,14 +832,19 @@ function DeployTargetCard({ suggestedPort, labelled = false }: { suggestedPort: 
         <span className="np-target-status" data-status={server.status}><i aria-hidden />{server.status === "online" ? "Online" : server.status}</span>
       </div>
       <dl className="np-target-stats">
-        <div><dt>CPU</dt><dd>{server.cpuPercent}%</dd><span className="meter"><span style={{ width: `${server.cpuPercent}%` }} /></span></div>
-        <div><dt>Memory</dt><dd>{formatGb(server.memoryUsedGb)} / {formatGb(server.memoryTotalGb)}</dd><span className="meter"><span style={{ width: `${(server.memoryUsedGb / server.memoryTotalGb) * 100}%` }} /></span></div>
-        <div><dt>Disk</dt><dd>{formatGb(server.storageUsedGb)} / {formatGb(server.storageTotalGb)}</dd><span className="meter"><span style={{ width: `${(server.storageUsedGb / server.storageTotalGb) * 100}%` }} /></span></div>
-        <div><dt>Projects</dt><dd>{state.projects.length} on this server</dd><span className="meter"><span style={{ width: `${Math.min(100, state.projects.length * 20)}%` }} /></span></div>
+        <div><dt>CPU</dt><dd>{server.cpuPercent}%</dd><Segments value={server.cpuPercent} /></div>
+        <div><dt>Memory</dt><dd>{formatGb(server.memoryUsedGb)} / {formatGb(server.memoryTotalGb)}</dd><Segments value={(server.memoryUsedGb / server.memoryTotalGb) * 100} /></div>
+        <div><dt>Disk</dt><dd>{formatGb(server.storageUsedGb)} / {formatGb(server.storageTotalGb)}</dd><Segments value={(server.storageUsedGb / server.storageTotalGb) * 100} /></div>
+        <div><dt>Projects</dt><dd>{state.projects.length} on this server</dd><Segments value={Math.min(100, state.projects.length * 20)} /></div>
       </dl>
       <p className="np-port"><span>Next free port</span><code>:{suggestedPort}</code></p>
     </section>
   )
+}
+
+function Segments({ value }: { value: number }) {
+  const filled = Math.ceil(Math.max(0, Math.min(100, value)) / 5)
+  return <span className="np-segments" aria-hidden>{Array.from({ length: 20 }, (_, index) => <i key={index} data-filled={index < filled} />)}</span>
 }
 
 function NextStepsCard({ stepIndex, labelled = false }: { stepIndex: number; labelled?: boolean }) {

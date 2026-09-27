@@ -93,6 +93,28 @@ export function UptimeBars({ days, label }: { days: ProjectHealth["days"]; label
 /** Status board for every project — which ones are up and which are down. */
 export function ServiceStatusBoard({ state, now }: { state: AppState; now: number }) {
   const rows = state.projects.map((project) => projectHealth(state, project, now))
+  if (!rows.length) {
+    return (
+      <section className="panel status-board">
+        <header className="status-board-head" data-health="none">
+          <span className="status-board-orb" aria-hidden><i /></span>
+          <div className="min-w-0 flex-1">
+            <p className="status-board-title">No services yet</p>
+            <p className="status-board-sub">Deploy a project and its up / down history starts here, one bar per day.</p>
+          </div>
+        </header>
+        <ul className="status-board-list" aria-hidden>
+          {[0, 1].map((row) => (
+            <li key={row} className="status-board-ghost">
+              <div className="status-board-name"><b /><b /></div>
+              <div className="uptime-bars">{Array.from({ length: 30 }, (_, index) => <span key={index} data-state="none" />)}</div>
+              <div className="status-board-side"><b /></div>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
   const down = rows.filter((row) => row.health === "down").length
   const degraded = rows.filter((row) => row.health === "degraded").length
   const overall: Health = down ? "down" : degraded ? "degraded" : "up"

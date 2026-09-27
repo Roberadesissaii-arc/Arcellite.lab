@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Activity, ArrowUpRight, Box, Boxes, Cable, Cog, Database, FolderKanban, GitBranch, Rocket, Clock, Container, Cpu, Gauge, Globe2, HardDrive, History, Layers, MapPin, MemoryStick, Monitor, Network, Plug, Plus, Radio, RefreshCw, Router, Server, type LucideIcon } from "lucide-react"
+import { Activity, ArrowUpRight, Boxes, Cable, Cog, Database,  Clock, Container, Cpu, Gauge, Globe2, HardDrive, Layers, MapPin, MemoryStick, Monitor, Network, Plug, Plus, Radio, RefreshCw, Router, Server, type LucideIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/toast"
 import { PageHeader } from "@/components/page-header"
@@ -37,8 +37,6 @@ export function ServersView() {
             const containers = state.containers.filter((item) => item.serverId === server.id)
             const projects = new Set(containers.map((item) => item.projectId).filter(Boolean))
             const ports = containers.flatMap((container) => container.ports.filter((port) => port.host).map((port) => ({ host: port.host, container: port.container, name: container.name })))
-            const names = new Set([server.name, ...containers.map((container) => container.name)])
-            const events = state.activity.filter((event) => names.has(event.objectName) || event.objectType === "Server").slice(0, 4)
             return (
               <li key={server.id} className="panel">
                 <Link href={`/servers/${server.id}`} className="item-row" data-interactive>
@@ -92,19 +90,6 @@ export function ServersView() {
                       {ports.map((port) => <span key={`${port.host}-${port.name}`} className="server-port"><code>:{port.host}</code><small>{port.name} → {port.container}</small></span>)}
                       {ports.length === 0 ? <span className="text-xs text-faint">No published ports.</span> : null}
                     </div>
-                  </section>
-                  <section>
-                    <p className="server-bottom-title"><History aria-hidden />Recent events</p>
-                    <ul className="server-events">
-                      {events.map((event) => (
-                        <li key={event.id}>
-                          <IconTile icon={EVENT_ICON[event.objectType] ?? History} tone={event.result === "error" ? "danger" : event.result === "warning" ? "warning" : "brand"} size="sm" />
-                          <span className="min-w-0 flex-1"><strong className="block truncate">{event.action}</strong><small className="block truncate">{event.objectType} · {event.objectName}</small></span>
-                          <time dateTime={event.timestamp}>{formatRelative(event.timestamp, now)}</time>
-                        </li>
-                      ))}
-                      {events.length === 0 ? <li className="text-faint">No events yet.</li> : null}
-                    </ul>
                   </section>
                 </div>
                 <div className="server-actions">
@@ -171,7 +156,6 @@ export function ServersView() {
 }
 
 const ROLE_ICON: Record<string, LucideIcon> = { web: Globe2, worker: Cog, data: Database }
-const EVENT_ICON: Record<string, LucideIcon> = { Deployment: Rocket, Container: Box, Server: Server, Domain: Globe2, Project: FolderKanban, "Git provider": GitBranch }
 
 function Resource({ label, value, meter }: { label: string; value: string; meter: number }) {
   return (

@@ -97,6 +97,13 @@ export function MetricsView() {
               <div className="panel">
                 <div className="usage-row usage-head" aria-hidden><span>Container</span><span>CPU</span><span>Memory</span></div>
                 <ul>
+                  {containers.length === 0 ? [0, 1, 2, 3].map((row) => (
+                    <li key={`ghost-${row}`} className="usage-row usage-ghost" aria-hidden={row > 0}>
+                      <span className="min-w-0">{row === 0 ? <><strong className="block text-[13px]">No containers running</strong><small className="text-faint">Usage appears per container once something is deployed.</small></> : <b />}</span>
+                      <span className="usage-cell"><span className="usage-bar" /></span>
+                      <span className="usage-cell"><span className="usage-bar" /></span>
+                    </li>
+                  )) : null}
                   {containers.map((container) => (
                     <li key={container.id} className="usage-row" title={`${container.name}: ${container.cpuPercent}% CPU, ${container.memoryMb} MB`}>
                       <span className="min-w-0">

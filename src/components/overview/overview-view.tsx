@@ -72,7 +72,7 @@ export function OverviewView() {
         <section className="min-w-0">
         <SectionHeading title="Projects" href="/projects" />
         <div className="panel">
-          {projects.length === 0 ? <div className="p-6"><p className="font-medium">No projects yet</p><Link href="/projects/new" className="mt-3 inline-block text-brand">Deploy your first application →</Link></div> :
+          {
             <ul className="panel-list overview-project-list">{projects.slice(0, 4).map((project) => {
               const latest = latestDeployment(state.deployments, project.id, now)
               return <li key={project.id}><Link href={`/projects/${project.id}`} className="overview-project">
@@ -87,7 +87,7 @@ export function OverviewView() {
               <li className="overview-project-slot" style={{ flexGrow: 4 - projects.length }}>
                 <Link href="/projects/new">
                   <span className="overview-project-slot-icon"><Plus aria-hidden /></span>
-                  <span className="min-w-0"><strong>Room for {4 - projects.length === 1 ? "another project" : `${4 - projects.length} more projects`}</strong><small>Deploy from GitHub, an upload, or a container image.</small></span>
+                  <span className="min-w-0"><strong>{projects.length === 0 ? "No projects yet — deploy your first one" : `Room for ${4 - projects.length === 1 ? "another project" : `${4 - projects.length} more projects`}`}</strong><small>Deploy from GitHub, an upload, or a container image.</small></span>
                   <span className="overview-project-slot-cta">New project<ArrowUpRight aria-hidden /></span>
                 </Link>
               </li>
@@ -103,7 +103,7 @@ export function OverviewView() {
 
       <AskArcCard />
 
-      <section><SectionHeading title="Latest deployments" href="/deployments" /><div className="panel"><ul className="panel-list">{recent.map(deployment => <li key={deployment.id}><Link className="release-row" href={`/deployments/${deployment.id}`}><span className="release-icon"><GitBranch size={16} /></span><span className="min-w-0"><strong>{state.projects.find(p => p.id === deployment.projectId)?.name ?? 'Project'}</strong><small className="block truncate text-faint">{deployment.commitMessage || deployment.sourceLabel}</small></span><span className="release-branch">{deployment.branch ?? 'Direct upload'}</span><DeploymentStatusView value={deployment.status} /><time className="text-faint">{formatRelative(deployment.createdAt, now)}</time></Link></li>)}{!recent.length && <li className="p-5 text-muted">Your first deployment will appear here.</li>}</ul></div></section>
+      <section><SectionHeading title="Latest deployments" href="/deployments" /><div className="panel"><ul className="panel-list">{recent.map(deployment => <li key={deployment.id}><Link className="release-row" href={`/deployments/${deployment.id}`}><span className="release-icon"><GitBranch size={16} /></span><span className="min-w-0"><strong>{state.projects.find(p => p.id === deployment.projectId)?.name ?? 'Project'}</strong><small className="block truncate text-faint">{deployment.commitMessage || deployment.sourceLabel}</small></span><span className="release-branch">{deployment.branch ?? 'Direct upload'}</span><DeploymentStatusView value={deployment.status} /><time className="text-faint">{formatRelative(deployment.createdAt, now)}</time></Link></li>)}{!recent.length && [0, 1, 2].map((row) => <li key={row} className="release-ghost" aria-hidden={row > 0}><span className="release-icon"><GitBranch size={16} /></span><span className="min-w-0 flex-1">{row === 0 ? <><strong>No deployments yet</strong><small className="block text-faint">Releases appear here with their branch, status, and time.</small></> : <><b /><b /></>}</span></li>)}</ul></div></section>
 
       <div className="overview-lower">
         {server ? <section>
