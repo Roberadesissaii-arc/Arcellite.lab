@@ -15,8 +15,8 @@ import { EmptyPanel, IconTile, SearchField, SectionHeading, StatCard, StatGrid, 
 import { DeploymentStatusView } from "@/components/ui/status"
 import { filterDeployments } from "@/lib/deploy/filters"
 import { formatDuration, formatRelative } from "@/lib/deploy/format"
-import { isTerminalStatus, materializeDeployment } from "@/lib/deploy/engine"
-import { useDeploy, useDeployState } from "@/lib/deploy/react"
+import { isTerminalStatus } from "@/lib/deploy/status"
+import { useDeploy, useDeployments, useDeployState } from "@/lib/deploy/react"
 import { useNow } from "@/lib/use-now"
 import { DeployError, type Deployment, type DeploymentStatus, type EnvironmentName } from "@/lib/deploy/types"
 
@@ -27,12 +27,13 @@ export function DeploymentsView() {
   const deploy = useDeploy()
   const router = useRouter()
   const toast = useToast()
+  // Ticks every second: in-flight rows re-read the provider and relative times stay fresh.
   const now = useNow(1000)
   const [search, setSearch] = useState("")
   const [projectId, setProjectId] = useState<string | "all">("all")
   const [environment, setEnvironment] = useState<EnvironmentName | "all">("all")
   const [status, setStatus] = useState<DeploymentStatus | "all">("all")
-  const live = useMemo(() => state ? state.deployments.map((deployment) => materializeDeployment(deployment, now)) : [], [state, now])
+  const live = useDeployments()
   const rows = useMemo(() => state ? filterDeployments(live, state.projects, { search, projectId, environment, status }) : [], [state, live, search, projectId, environment, status])
   const tableRows: DeploymentRow[] = rows.map((deployment) => ({
     ...deployment,
@@ -105,7 +106,7 @@ export function DeploymentsView() {
         <StatCard icon={Loader} tone="info" label="In progress" value={running} detail={running ? "Building right now" : "Nothing building"} />
         <StatCard icon={CircleAlert} tone={failed ? "danger" : "neutral"} label="Failed" value={failed} detail={failed ? "Needs a look" : "No failed releases"} />
       </StatGrid>
-      <ServiceStatusBoard state={state} now={now} />
+      <ServiceStatusBoard state={state} />
       <section>
         <SectionHeading title="Releases" count={rows.length} />
         <div className="filter-toolbar">

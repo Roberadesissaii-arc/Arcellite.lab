@@ -12,7 +12,7 @@ import { EmptyState, PageSkeleton } from "@/components/ui/bits"
 import { DeploymentStatusView } from "@/components/ui/status"
 import { useToast } from "@/components/ui/toast"
 import { DeployError } from "@/lib/deploy/types"
-import { latestDeployment, projectBadge, sourceText } from "@/lib/deploy/helpers"
+import { projectBadge, sourceText } from "@/lib/deploy/helpers"
 import { useDeploy, useDeployState } from "@/lib/deploy/react"
 import { useNow } from "@/lib/use-now"
 
@@ -30,7 +30,8 @@ export function ProjectFrame({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const state = useDeployState()
   const deploy = useDeploy()
-  const now = useNow()
+  // Re-read the latest deployment status on this interval.
+  useNow()
   const toast = useToast()
   const router = useRouter()
   const reduced = useReducedMotion()
@@ -54,7 +55,7 @@ export function ProjectFrame({ children }: { children: React.ReactNode }) {
       </div>
     )
   }
-  const latest = latestDeployment(state.deployments, project.id, now)
+  const latest = deploy.latestDeployment(project.id)
   const base = `/projects/${project.id}`
   const githubOff = project.source.type === "github" && !state.github.connected
 

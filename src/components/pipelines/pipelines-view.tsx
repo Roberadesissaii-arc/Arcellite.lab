@@ -8,9 +8,9 @@ import { PageHeader } from "@/components/page-header"
 import { PageSkeleton } from "@/components/ui/bits"
 import { EmptyPanel, SectionHeading, StatCard, StatGrid } from "@/components/ui/kit"
 import { DeploymentStatusView } from "@/components/ui/status"
-import { isTerminalStatus, materializeDeployment } from "@/lib/deploy/engine"
+import { isTerminalStatus } from "@/lib/deploy/status"
 import { formatDuration, formatRelative } from "@/lib/deploy/format"
-import { useDeployState } from "@/lib/deploy/react"
+import { useDeployments, useDeployState } from "@/lib/deploy/react"
 import type { Deployment } from "@/lib/deploy/types"
 import { useNow } from "@/lib/use-now"
 
@@ -33,20 +33,18 @@ export function PipelinesView() {
   const now = useNow(1000)
   const reduced = useReducedMotion()
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["id"]>("all")
+  const jobs = useDeployments()
   if (!state) return <PageSkeleton variant="table" />
-  const jobs = [...state.deployments]
-    .map((deployment) => materializeDeployment(deployment, now))
-    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
   const active = jobs.filter((job) => !isTerminalStatus(job.status))
   const done = jobs.filter((job) => job.status === "ready").length
   const failed = jobs.filter((job) => job.status === "failed").length
   const finished = jobs.filter((job) => job.finishedAt && job.status === "ready")
   const avg = finished.length ? finished.reduce((sum, job) => sum + (Date.parse(job.finishedAt!) - Date.parse(job.createdAt)), 0) / finished.length : 0
 
-  // Stage analytics: the same seven steps run for every release.
+  // Stage analytics keyed by phase, so pipelines with different steps still line up.
   const template = jobs[0]?.steps ?? []
-  const stages = template.map((step, index) => {
-    const runs = jobs.map((job) => job.steps[index]).filter(Boolean)
+  const stages = template.map((step) => {
+    const runs = jobs.flatMap((job) => job.steps.filter((run) => run.phase === step.phase))
     const timed = runs.filter((run) => run.status === "completed").map((run) => stepMs(run, now))
     const failures = runs.filter((run) => run.status === "failed").length
     return {

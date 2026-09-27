@@ -21,8 +21,8 @@ import { useToast } from "@/components/ui/toast"
 import { LogStream } from "@/components/logs/log-stream"
 import { FRAMEWORKS, FRAMEWORK_ORDER } from "@/lib/deploy/detect"
 import { formatDuration, formatRelative, formatUptime } from "@/lib/deploy/format"
-import { deploymentsFor, liveDeployment, portTaken, projectEndpoint } from "@/lib/deploy/helpers"
-import { useDeploy, useDeployState } from "@/lib/deploy/react"
+import { portTaken, projectEndpoint } from "@/lib/deploy/helpers"
+import { useDeploy, useDeployState, useLiveDeployment, useProjectDeployments } from "@/lib/deploy/react"
 import { useNow } from "@/lib/use-now"
 import type { Deployment, EnvironmentVariable, Framework, RestartPolicy } from "@/lib/deploy/types"
 import { DeployError } from "@/lib/deploy/types"
@@ -61,10 +61,10 @@ export function ProjectOverview() {
   const { state, project } = useProject()
   const now = useNow()
   const toast = useToast()
+  const history = useProjectDeployments(project?.id)
+  const live = useLiveDeployment(project?.id)
   if (!state || !project) return null
-  const history = deploymentsFor(state.deployments, project.id, now)
   const latest = history[0]
-  const live = liveDeployment(state, project, now)
   const containers = state.containers.filter((item) => item.projectId === project.id)
   const web = containers.find((item) => item.role === "web")
   const endpoint = projectEndpoint(project, state.servers[0]?.ip)
@@ -86,7 +86,7 @@ export function ProjectOverview() {
         <StatCard icon={Clock} tone="success" label="Uptime" value={formatUptime(web?.startedAt ?? null, now)} detail={avgMs ? `Average build ${formatDuration(avgMs)}` : "No finished builds"} />
       </StatGrid>
 
-      <Reveal><ProjectStatusCard state={state} project={project} now={now} /></Reveal>
+      <Reveal><ProjectStatusCard project={project} /></Reveal>
 
       <div className="project-grid">
         <Reveal index={0} className="panel project-card">
@@ -195,9 +195,9 @@ export function ProjectDeployments() {
   const now = useNow()
   const reduced = useReducedMotion()
   const [filter, setFilter] = useState<(typeof DEPLOY_FILTERS)[number]["id"]>("all")
+  const rows = useProjectDeployments(project?.id)
+  const live = useLiveDeployment(project?.id)
   if (!state || !project) return null
-  const rows = deploymentsFor(state.deployments, project.id, now)
-  const live = liveDeployment(state, project, now)
   if (!rows.length) {
     return <EmptyState title="No deployments" body="Deploy the project to see releases here." />
   }
@@ -575,7 +575,9 @@ function ProjectSettingsForm() {
   if (!state || !project) return null
   const dirty = JSON.stringify(form) !== JSON.stringify(saved)
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => setForm((current) => ({ ...current, [key]: value }))
-  const showFailure = project.id === "proj_api" || state.settings.developerMode || project.simulateFailure
+  // Failure simulation is a mock dev tool; a provider without `dev` never shows it.
+  const dev = deploy.dev
+  const showFailure = Boolean(dev) && (project.id === "proj_api" || state.settings.developerMode || project.simulateFailure)
   const portClash = form.port !== String(project.exposedPort) && portTaken(state.projects, Number(form.port), project.id)
 
   function save() {
@@ -599,9 +601,8 @@ function ProjectSettingsForm() {
       portMode: "custom",
       healthPath: form.health,
       restartPolicy: form.restart,
-      simulateFailure: form.failure,
       autoDeploy: form.auto,
-    }).then(
+    }).then(() => (dev && form.failure !== project!.simulateFailure ? dev.setSimulateFailure(project!.id, form.failure) : undefined)).then(
       () => {
         setSaved(form)
         toast({ title: "Project settings saved", description: "They apply on the next deploy." })

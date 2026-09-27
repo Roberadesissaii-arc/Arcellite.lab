@@ -52,7 +52,9 @@ Browser
       server provider later
 ```
 
-Domain types, the deployment state machine, and fixture data live in `src/lib/deploy`. The UI reads a snapshot and calls the provider. Replacing `mock-provider.ts` with a provider that talks to a Go agent should not require a new interface.
+Domain types, the deployment state machine, and fixture data live in `src/lib/deploy`. The UI reads a snapshot and calls the provider. Deployment state, logs, metrics, and service health reach feature views only through provider hooks (`useDeployment`, `useLogs`, `useServerMetrics`, `useProjectHealth`), so views never compute simulated infrastructure themselves. Replacing `mock-provider.ts` with a server-backed provider should not require a new interface.
+
+`src/lib/api/contracts` holds Zod schemas for the future wire format: browser-safe DTOs (secrets are write-only) and a structured `ApiError` with stable codes. Mutations accept an optional idempotency key, and mock-only tools (demo reset, workspace clear, failure simulation, raw export) live behind `provider.dev`. There is still no backend: everything runs in the browser.
 
 The mock engine advances a deployment through queued, preparing, installing, building, image creation, start, and health check on a fixed timeline. Failures happen only when a project is marked to simulate a failed build. API Sandbox exposes that control. Developer mode in Settings exposes it on every project.
 

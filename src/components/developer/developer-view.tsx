@@ -38,13 +38,16 @@ export function DeveloperView() {
   const deploy = useDeploy()
   const toast = useToast()
   const [reset, setReset] = useState<"demo" | "empty" | null>(null)
+  // Simulations, resets, and raw export exist only on a provider with mock dev tools.
+  const dev = deploy.dev
   if (!state) return <PageSkeleton variant="detail" />
   const json = JSON.stringify(state)
   const sizeKb = new Blob([json]).size / 1024
   const records = COLLECTIONS.reduce((sum, item) => sum + (Array.isArray(state[item.key]) ? (state[item.key] as unknown[]).length : 0), 0)
 
   function exportState() {
-    const url = URL.createObjectURL(new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }))
+    if (!dev) return
+    const url = URL.createObjectURL(new Blob([JSON.stringify(dev.exportWorkspace(), null, 2)], { type: "application/json" }))
     const link = document.createElement("a")
     link.href = url
     link.download = "arcellite-workspace.json"
@@ -55,16 +58,16 @@ export function DeveloperView() {
 
   return (
     <div className="page page-wide page-stack">
-      <PageHeader icon={Code2} kicker="Account" title="Developer tools" description="Inspect the workspace state, turn on simulations for testing, and export or reset the data this browser holds." actions={<Button variant="primary" onClick={exportState}><Download aria-hidden />Export JSON</Button>} />
+      <PageHeader icon={Code2} kicker="Account" title="Developer tools" description="Inspect the workspace state, turn on simulations for testing, and export or reset the data this browser holds." actions={dev ? <Button variant="primary" onClick={exportState}><Download aria-hidden />Export JSON</Button> : undefined} />
       <StatGrid>
-        <StatCard icon={Layers} tone="brand" label="Provider" value="Mock" detail="Phase 1 · in the browser" />
+        <StatCard icon={Layers} tone="brand" label="Provider" value={deploy.capabilities.mode === "mock" ? "Mock" : "Server"} detail={deploy.capabilities.mode === "mock" ? "Phase 1 · in the browser" : "Control plane"} />
         <StatCard icon={Braces} tone="info" label="Schema" value={`v${state.schema}`} detail="Stored state version" />
         <StatCard icon={HardDrive} tone="neutral" label="State size" value={<>{sizeKb.toFixed(1)}<small> KB</small></>} detail="localStorage" />
         <StatCard icon={Database} tone="success" label="Records" value={records} detail={`Across ${COLLECTIONS.length} collections`} />
       </StatGrid>
 
       <div className="dev-grid">
-        <section>
+        {dev ? <section>
           <SectionHeading title="Simulations" />
           <div className="setting-group">
             <div className="setting-rows">
@@ -82,7 +85,7 @@ export function DeveloperView() {
               </div>
             </div>
           </div>
-        </section>
+        </section> : null}
         <section>
           <SectionHeading title="State" aside={<Tag tone="brand">{records} records</Tag>} />
           <ul className="panel dev-collections">
@@ -102,7 +105,8 @@ export function DeveloperView() {
         danger
         onOpenChange={(open) => { if (!open) setReset(null) }}
         onConfirm={() => {
-          const action = reset === "demo" ? deploy.resetDemo() : deploy.clearWorkspace()
+          if (!dev) return
+          const action = reset === "demo" ? dev.resetDemo() : dev.clearWorkspace()
           void action.then(() => {
             toast({ title: reset === "demo" ? "Demo data loaded" : "Workspace cleared" })
             setReset(null)

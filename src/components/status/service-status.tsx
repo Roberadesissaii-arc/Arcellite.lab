@@ -5,58 +5,10 @@ import { useState } from "react"
 import { motion, useReducedMotion } from "motion/react"
 import { ArrowUpRight } from "lucide-react"
 import { formatDate } from "@/lib/deploy/format"
-import { latestDeployment, projectBadge } from "@/lib/deploy/helpers"
-import type { AppState, Project } from "@/lib/deploy/types"
+import { useDeploy, useProjectHealth } from "@/lib/deploy/react"
+import type { AppState, Health, Project, ProjectHealth } from "@/lib/deploy/types"
 
-const DAY = 24 * 60 * 60 * 1000
 const DAYS = 30
-
-export type Health = "up" | "degraded" | "down"
-type DayState = Health | "none"
-
-export interface ProjectHealth {
-  project: Project
-  health: Health
-  label: string
-  detail: string
-  uptime: number | null
-  days: { start: number; state: DayState; note: string }[]
-}
-
-/**
- * Up / degraded / down for a project, with a 30-day history derived from its
- * releases: a failed release marks that day degraded, a stopped web container
- * marks today down. Phase 1 has no external probe, so this is release health.
- */
-export function projectHealth(state: AppState, project: Project, now: number): ProjectHealth {
-  const latest = latestDeployment(state.deployments, project.id, now)
-  const badge = projectBadge(project, latest)
-  const web = state.containers.find((item) => item.projectId === project.id && item.role === "web")
-  const down = project.runtime === "stopped" || !project.liveDeploymentId || web?.state === "stopped" || web?.state === "exited"
-  const health: Health = down ? "down" : badge === "failed" ? "degraded" : "up"
-  const today = new Date(now)
-  today.setHours(0, 0, 0, 0)
-  const created = Date.parse(project.createdAt)
-  const deployments = state.deployments.filter((item) => item.projectId === project.id)
-  const days = Array.from({ length: DAYS }, (_, index) => {
-    const start = today.getTime() - (DAYS - 1 - index) * DAY
-    const end = start + DAY
-    if (end <= created) return { start, state: "none" as DayState, note: "Not deployed yet" }
-    const inDay = deployments.filter((item) => {
-      const time = Date.parse(item.createdAt)
-      return time >= start && time < end
-    })
-    const failed = inDay.filter((item) => item.status === "failed").length
-    if (index === DAYS - 1 && health !== "up") return { start, state: health as DayState, note: health === "down" ? "Not serving" : "Latest release failed" }
-    if (failed) return { start, state: "degraded" as DayState, note: `${failed} failed release${failed === 1 ? "" : "s"}` }
-    return { start, state: "up" as DayState, note: inDay.length ? `${inDay.length} release${inDay.length === 1 ? "" : "s"}, all healthy` : "Serving normally" }
-  })
-  const tracked = days.filter((day) => day.state !== "none")
-  const uptime = tracked.length ? (tracked.reduce((sum, day) => sum + (day.state === "up" ? 1 : day.state === "degraded" ? 0.98 : 0), 0) / tracked.length) * 100 : null
-  const label = health === "up" ? "Operational" : health === "degraded" ? "Degraded" : "Down"
-  const detail = health === "up" ? "Serving the latest release" : health === "degraded" ? "Previous release still serving" : project.runtime === "stopped" ? "Web container stopped" : "No live release"
-  return { project, health, label, detail, uptime, days }
-}
 
 export function HealthPill({ health, label }: { health: Health; label: string }) {
   return <span className="health-pill" data-health={health}><i aria-hidden />{label}</span>
@@ -91,8 +43,12 @@ export function UptimeBars({ days, label }: { days: ProjectHealth["days"]; label
 }
 
 /** Status board for every project — which ones are up and which are down. */
-export function ServiceStatusBoard({ state, now }: { state: AppState; now: number }) {
-  const rows = state.projects.map((project) => projectHealth(state, project, now))
+export function ServiceStatusBoard({ state }: { state: AppState }) {
+  const deploy = useDeploy()
+  const rows = state.projects.flatMap((project) => {
+    const health = deploy.projectHealth(project.id)
+    return health ? [{ ...health, project }] : []
+  })
   if (!rows.length) {
     return (
       <section className="panel status-board">
@@ -147,8 +103,9 @@ export function ServiceStatusBoard({ state, now }: { state: AppState; now: numbe
 }
 
 /** One project's status: current health, uptime, and the 30-day strip. */
-export function ProjectStatusCard({ state, project, now }: { state: AppState; project: Project; now: number }) {
-  const row = projectHealth(state, project, now)
+export function ProjectStatusCard({ project }: { project: Project }) {
+  const row = useProjectHealth(project.id)
+  if (!row) return null
   return (
     <section className="panel status-card" data-health={row.health}>
       <div className="status-card-head">

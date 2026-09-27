@@ -7,8 +7,7 @@ import { SelectInput } from "@/components/ui/fields"
 import { SearchField } from "@/components/ui/kit"
 import { useToast } from "@/components/ui/toast"
 import { formatClock } from "@/lib/deploy/format"
-import { collectLogs } from "@/lib/deploy/logs"
-import { useDeployState } from "@/lib/deploy/react"
+import { useDeployState, useLogs } from "@/lib/deploy/react"
 import { useNow } from "@/lib/use-now"
 import type { AppState, LogEntry, LogLevel, LogQuery } from "@/lib/deploy/types"
 
@@ -40,7 +39,8 @@ export function LogStream({
   insights?: boolean
 }) {
   const state = useDeployState()
-  const now = useNow(1000)
+  // Re-read the provider on this interval so lines written mid-step appear while following.
+  useNow(1000)
   const toast = useToast()
   const [level, setLevel] = useState<LogLevel | "all">("all")
   const [search, setSearch] = useState("")
@@ -56,7 +56,7 @@ export function LogStream({
     return { target: (kind || target) as LogQuery["target"], id: value || id }
   }, [chosen, target, id])
 
-  const everything = state ? collectLogs(state, { target: resolved.target, id: resolved.id, level: "all", search }, now) : []
+  const everything = useLogs({ target: resolved.target, id: resolved.id, level: "all", search })
   const live = level === "all" ? everything : everything.filter((row) => row.level === level)
   const rows = paused && frozen ? frozen : live
   const counts = { all: everything.length, info: 0, warn: 0, error: 0, debug: 0 } as Record<LogLevel | "all", number>

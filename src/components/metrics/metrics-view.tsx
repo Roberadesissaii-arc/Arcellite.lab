@@ -9,8 +9,7 @@ import { SelectInput } from "@/components/ui/fields"
 import { EmptyPanel, IconTile, SectionHeading, SegmentMeter, StatCard, StatGrid, Tag } from "@/components/ui/kit"
 import { useToast } from "@/components/ui/toast"
 import { formatGb, formatPercent, formatRelative, formatUptime } from "@/lib/deploy/format"
-import { serverMetrics } from "@/lib/deploy/helpers"
-import { useDeploy, useDeployState } from "@/lib/deploy/react"
+import { useDeploy, useDeployState, useServerMetrics } from "@/lib/deploy/react"
 import { useNow } from "@/lib/use-now"
 
 const RANGES = [
@@ -35,10 +34,10 @@ export function MetricsView() {
   const now = useNow()
   const [serverId, setServerId] = useState(state?.servers[0]?.id ?? "")
   const [hours, setHours] = useState<(typeof RANGES)[number]["hours"]>(24)
+  const server = state ? state.servers.find((item) => item.id === (serverId || state.servers[0]?.id)) ?? state.servers[0] : undefined
+  const metrics = useServerMetrics(server?.id)
   if (!state) return <PageSkeleton variant="cards" />
-  const server = state.servers.find((item) => item.id === (serverId || state.servers[0]?.id)) ?? state.servers[0]
-  if (!server) return <div className="page"><EmptyPanel icon={Gauge} title="No server to measure" body="Connect a server to see telemetry." /></div>
-  const metrics = serverMetrics(server, state)
+  if (!server || !metrics) return <div className="page"><EmptyPanel icon={Gauge} title="No server to measure" body="Connect a server to see telemetry." /></div>
   const slice = (values: number[]) => values.slice(-hours)
   const memoryPct = (metrics.memoryUsedGb / metrics.memoryTotalGb) * 100
   const diskPct = (metrics.storageUsedGb / metrics.storageTotalGb) * 100
