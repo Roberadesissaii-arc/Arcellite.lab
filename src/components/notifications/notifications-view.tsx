@@ -1,11 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { Bell } from "lucide-react"
+import { Bell, Globe2, Rocket, Server } from "lucide-react"
 import { ActivityTimeline } from "@/components/activity/timeline"
 import { PageHeader } from "@/components/page-header"
 import { PageSkeleton } from "@/components/ui/bits"
-import { EmptyPanel, SectionHeading } from "@/components/ui/kit"
+import { EmptyPanel, SectionHeading, StatCard, StatGrid } from "@/components/ui/kit"
 import { useDeployState } from "@/lib/deploy/react"
 import type { ActivityEvent } from "@/lib/deploy/types"
 import { useNow } from "@/lib/use-now"
@@ -33,8 +33,14 @@ export function NotificationsView() {
   const active = CATEGORIES.find((item) => item.id === category) ?? CATEGORIES[0]
   const items = allowed.filter(active.match)
   return (
-    <div className="page page-stack">
+    <div className="page page-wide page-stack">
       <PageHeader icon={Bell} kicker="Workspace" title="Notifications" description="Recent changes in this workspace." />
+      <StatGrid>
+        <StatCard icon={Bell} tone="brand" label="Inbox" value={allowed.length} detail="Matching your preferences" />
+        <StatCard icon={Rocket} tone="info" label="Deployments" value={allowed.filter(CATEGORIES[1].match).length} detail="Builds and releases" />
+        <StatCard icon={Globe2} tone="neutral" label="Domains" value={allowed.filter(CATEGORIES[2].match).length} detail="DNS and certificates" />
+        <StatCard icon={Server} tone="success" label="Infrastructure" value={allowed.filter(CATEGORIES[3].match).length} detail="Servers and containers" />
+      </StatGrid>
       <section>
         <SectionHeading title="Inbox" count={items.length} href="/settings" action="Notification settings" />
         <div className="page-toolbar mb-3">

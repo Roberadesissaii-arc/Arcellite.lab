@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { Bell, Download, FolderGit2, Info, Lock, Palette, RefreshCw, Rocket, Server, Settings, SlidersHorizontal, Wrench, type LucideIcon } from "lucide-react"
+import { Bell, FolderGit2, Info, Lock, Palette, RefreshCw, Rocket, Server, Settings, SlidersHorizontal, type LucideIcon } from "lucide-react"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { CopyButton, PageSkeleton } from "@/components/ui/bits"
@@ -18,7 +18,7 @@ import type { EnvironmentName, MotionChoice, Settings as SettingsShape } from "@
 import { useNow } from "@/lib/use-now"
 import { setToastPrefs, useToastPrefs, type ToastPosition, type ToastStyle } from "@/lib/toast-prefs"
 
-const SECTIONS = ["General", "Appearance", "Notifications", "Git providers", "Deployment defaults", "Security", "Server agent", "Advanced"] as const
+const SECTIONS = ["General", "Appearance", "Notifications", "Git providers", "Deployment defaults", "Security", "Server agent"] as const
 type Section = (typeof SECTIONS)[number]
 
 const SECTION_META: Record<Section, { icon: LucideIcon; blurb: string }> = {
@@ -29,7 +29,6 @@ const SECTION_META: Record<Section, { icon: LucideIcon; blurb: string }> = {
   "Deployment defaults": { icon: Rocket, blurb: "Branch, ports, builds, and rollback for new projects." },
   Security: { icon: Lock, blurb: "How secrets and sensitive values are handled." },
   "Server agent": { icon: Server, blurb: "The agent that runs work on each of your servers." },
-  Advanced: { icon: Wrench, blurb: "Developer tools, exports, and demo data." },
 }
 
 const TIMEZONES = ["UTC", "America/New_York", "America/Chicago", "America/Los_Angeles", "Europe/London", "Europe/Berlin", "Africa/Addis_Ababa", "Asia/Dubai", "Asia/Tokyo"]
@@ -73,7 +72,6 @@ export function SettingsView() {
   const section: Section = choice && choice.from === requested ? choice.section : SECTIONS.find((item) => item === requested) ?? "General"
   const setSection = (next: Section) => setChoice({ from: requested, section: next })
   const [disconnect, setDisconnect] = useState(false)
-  const [reset, setReset] = useState<"demo" | "empty" | null>(null)
   if (!state) return <PageSkeleton variant="detail" />
   const settings = state.settings
   const set = (patch: Partial<SettingsShape>, title = "Setting saved") => void deploy.updateSettings(patch).then(() => toast({ title }))
@@ -259,25 +257,6 @@ export function SettingsView() {
               </Group>
             </> : null}
 
-            {section === "Advanced" ? <>
-              <Group title="Developer">
-                <Row label="Developer mode" hint="Shows the simulate-failure control on every project. A domain ending in .invalid always fails verification."><Toggle label="Developer mode" checked={settings.developerMode} onChange={(value) => set({ developerMode: value }, value ? "Developer mode on" : "Developer mode off")} /></Row>
-                <Row label="Export workspace" hint="Download the demo state as JSON. Secrets are included, so keep the file private.">
-                  <Button variant="secondary" size="sm" onClick={() => {
-                    const url = URL.createObjectURL(new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }))
-                    const link = document.createElement("a")
-                    link.href = url
-                    link.download = "arcellite-workspace.json"
-                    link.click()
-                    URL.revokeObjectURL(url)
-                  }}><Download aria-hidden />Export</Button>
-                </Row>
-              </Group>
-              <Group title="Danger zone">
-                <Row label="Load demo data" hint="Replace this workspace with sample projects, deployments, and domains to explore."><Button variant="secondary" size="sm" onClick={() => setReset("demo")}>Load demo</Button></Row>
-                <Row label="Clear workspace" hint="Remove every project, deployment, domain, and log. This server stays registered."><Button variant="danger" size="sm" onClick={() => setReset("empty")}>Clear</Button></Row>
-              </Group>
-            </> : null}
           </div>
         </div>
       </div>
@@ -292,21 +271,6 @@ export function SettingsView() {
           void deploy.disconnectGitHub().then(() => {
             toast({ title: "GitHub disconnected" })
             setDisconnect(false)
-          })
-        }}
-      />
-      <ConfirmDialog
-        open={reset !== null}
-        title={reset === "demo" ? "Load demo data?" : "Clear this workspace?"}
-        body={reset === "demo" ? "Everything in the workspace is replaced with the sample lab. Theme and motion preferences stay." : "Projects, deployments, domains, volumes, and logs are removed. Settings stay."}
-        confirmLabel={reset === "demo" ? "Load demo" : "Clear workspace"}
-        danger
-        onOpenChange={(open) => { if (!open) setReset(null) }}
-        onConfirm={() => {
-          const action = reset === "demo" ? deploy.resetDemo() : deploy.clearWorkspace()
-          void action.then(() => {
-            toast({ title: reset === "demo" ? "Demo data loaded" : "Workspace cleared" })
-            setReset(null)
           })
         }}
       />

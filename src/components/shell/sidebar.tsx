@@ -173,7 +173,7 @@ export function SidebarNav({
           <MenuItem onSelect={() => router.push("/settings")}>
             <SettingsIcon className="h-3.5 w-3.5" /> Workspace settings
           </MenuItem>
-          <MenuItem onSelect={() => router.push("/settings?section=Advanced")}>
+          <MenuItem onSelect={() => router.push("/developer")}>
             <Code2 className="h-3.5 w-3.5" /> Developer tools
           </MenuItem>
           <MenuItem onSelect={() => router.push("/docs")}>
