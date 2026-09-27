@@ -2107,3 +2107,37 @@ html[data-motion="reduce"] .btn:active, html[data-motion="reduce"] .icon-btn:act
   .status-board-list > li { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
   .status-board-list .uptime { grid-column: 1 / -1; grid-row: 2; }
 }
+
+/* Ask Arc: thinking state (thinking-orbs) */
+.chat-thinking { align-items: center; }
+.chat-thinking-orb { flex: none; display: grid; place-items: center; width: 40px; height: 40px; margin-left: -6px; border-radius: 12px; background: radial-gradient(circle, #f3f3fe 40%, transparent 72%); }
+.chat-thinking-orb canvas { width: 32px !important; height: 32px !important; }
+.chat-thinking-pill {
+  display: inline-flex; align-items: center; gap: 14px; height: 44px; padding: 0 18px 0 16px; border-radius: 999px;
+  background: #fff; border: 1px solid var(--border-subtle);
+  box-shadow: 0 1px 2px rgba(15,15,30,.04), 0 8px 22px -14px rgba(93,95,239,.35);
+}
+.chat-thinking-label {
+  display: inline-block; font-size: 13.5px; font-weight: 550; white-space: nowrap;
+  background: linear-gradient(90deg, var(--text-tertiary) 0%, var(--text-primary) 40%, var(--text-tertiary) 80%);
+  background-size: 220% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: chat-shimmer 1.8s linear infinite;
+}
+@keyframes chat-shimmer { from { background-position: 110% 0; } to { background-position: -110% 0; } }
+.chat-thinking-steps { display: inline-flex; gap: 4px; }
+.chat-thinking-steps i { width: 14px; height: 4px; border-radius: 4px; background: #e6e6ee; transition: background-color 240ms ease-out, width 300ms cubic-bezier(.2,.8,.2,1); }
+.chat-thinking-steps i[data-state="done"] { background: color-mix(in srgb, var(--brand-primary) 55%, white); }
+.chat-thinking-steps i[data-state="active"] { width: 22px; background: var(--brand-primary); }
+.chat-stop svg { width: 12px; height: 12px; fill: currentColor; }
+.chat-message-assistant:last-child:not(.chat-thinking) { animation: chat-answer-in 420ms cubic-bezier(.2,.8,.2,1) both; }
+@keyframes chat-answer-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-motion="full"]) .chat-thinking-label { animation: none; color: var(--text-secondary); background: none; }
+  html:not([data-motion="full"]) .chat-message-assistant:last-child { animation: none; }
+}
+.chat-thinking-orb { width: 48px; height: 48px; margin-left: -10px; background: radial-gradient(circle, #f1f1fe 35%, transparent 70%); }
+.chat-thinking-orb canvas { width: 44px !important; height: 44px !important; }
+.chat-thinking { min-width: 0; }
+.chat-thinking-pill { min-width: 0; max-width: calc(100% - 48px); }
+.chat-thinking-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+@container (max-width: 600px) { .chat-thinking-orb { margin-left: 0; } .chat-thinking-pill { padding: 0 14px; gap: 10px; } }
