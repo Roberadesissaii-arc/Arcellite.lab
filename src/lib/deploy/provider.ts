@@ -18,6 +18,10 @@ import type {
 /** What the provider is actually connected to. Describes reality, not product rollout. */
 export interface DeployProviderCapabilities {
   mode: "mock" | "server"
+  /** Projects, settings, and activity are stored by the Arcellite control plane (PostgreSQL). */
+  realControlPlane: boolean
+  /** Deployments can be started. False until the server provider has a real build pipeline. */
+  deployments: boolean
   /** Deployments, containers, and servers are real Docker/host operations. */
   realInfrastructure: boolean
   /** Repositories come from a real GitHub App installation. */
@@ -30,6 +34,22 @@ export interface DeployProviderCapabilities {
   realLogs: boolean
   /** Saved secret values can be shown again in the browser. */
   secretReveal: boolean
+  /** Showing a saved secret requires the current password (see `revealSecret`). */
+  secretRevealRequiresPassword: boolean
+}
+
+/** The signed-in person, when the provider has real accounts. */
+export interface DeploySession {
+  user: { id: string; login: string; displayName: string }
+  workspace: { id: string; name: string }
+  role: "owner" | "admin" | "developer" | "viewer"
+  capabilities: readonly string[]
+}
+
+export interface DeployAuth {
+  /** Null until loaded. */
+  session(): DeploySession | null
+  signOut(): Promise<void>
 }
 
 /**
@@ -66,6 +86,8 @@ export interface MockDevTools {
 export interface DeployProvider {
   readonly capabilities: DeployProviderCapabilities
   readonly dev?: MockDevTools
+  /** Present only when the provider has real accounts (server mode). */
+  readonly auth?: DeployAuth
 
   /** Opens the provider's cache (storage load, event stream). Returns a stop function. */
   start?(): () => void
@@ -104,4 +126,9 @@ export interface DeployProvider {
   disconnectGitHub(options?: MutationOptions): Promise<void>
   updateSettings(patch: Partial<Settings>, options?: MutationOptions): Promise<Settings>
   completeOnboarding(options?: MutationOptions): Promise<void>
+  /**
+   * Returns a saved secret's value after re-checking the current password. Providers that
+   * keep plaintext in the browser (the mock) leave this undefined and show values directly.
+   */
+  revealSecret?(projectId: string, variableId: string, password: string): Promise<string>
 }

@@ -10,7 +10,8 @@ import { ArcelliteMark } from "@/components/brand"
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/overlays"
 import { useToast } from "@/components/ui/toast"
 import { cn } from "@/lib/cn"
-import { useDeployState } from "@/lib/deploy/react"
+import { useDeploy, useDeployState } from "@/lib/deploy/react"
+import { DeployError } from "@/lib/deploy/types"
 
 const SIDEBAR_KEY = "arcellite-deploy-sidebar"
 const APP_VERSION = "0.1.0"
@@ -75,6 +76,7 @@ export function SidebarNav({
   const pathname = usePathname()
   const router = useRouter()
   const toast = useToast()
+  const deploy = useDeploy()
   const state = useDeployState()
   const name = state?.settings.displayName ?? "Robera"
   const workspace = state?.settings.workspaceName ?? "Arcellite Lab"
@@ -182,12 +184,18 @@ export function SidebarNav({
           <MenuSeparator />
           <MenuItem
             danger
-            onSelect={() =>
+            onSelect={() => {
+              if (deploy.auth) {
+                deploy.auth.signOut().catch((error: unknown) =>
+                  toast({ title: "Could not sign out", description: error instanceof DeployError ? error.detail : undefined, tone: "danger" }),
+                )
+                return
+              }
               toast({
                 title: "No account to sign out of",
                 description: "Phase 1 keeps this workspace in the browser.",
               })
-            }
+            }}
           >
             <LogOut className="h-3.5 w-3.5" /> Sign Out
           </MenuItem>

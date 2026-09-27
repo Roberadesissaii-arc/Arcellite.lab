@@ -1,5 +1,5 @@
 import "server-only"
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto"
+import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes } from "node:crypto"
 import { masterKeyring, type MasterKeyring } from "@/server/config"
 
 /** An encrypted value as stored: every part base64. */
@@ -64,4 +64,20 @@ let cached: SecretBox | null = null
 export function secretBox(): SecretBox {
   cached ??= createSecretBox(masterKeyring())
   return cached
+}
+
+let digestKey: Buffer | null = null
+
+/**
+ * HMAC-SHA256 under a key derived from ARCELLITE_MASTER_KEY (version 1, so it survives
+ * rotation). Used where a fingerprint of request data is stored, such as idempotency
+ * request hashes, so a stored digest of a low-entropy secret cannot be brute-forced offline.
+ */
+export function keyedDigest(value: string): string {
+  if (!digestKey) {
+    const root = masterKeyring().keys.get(1)
+    if (!root) throw new DecryptionError()
+    digestKey = Buffer.from(hkdfSync("sha256", root, Buffer.alloc(0), "arcellite:request-digest:v1", 32))
+  }
+  return createHmac("sha256", digestKey).update(value, "utf8").digest("hex")
 }

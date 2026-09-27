@@ -8,12 +8,15 @@ import { DeployError } from "./types"
 
 export const MOCK_CAPABILITIES: DeployProviderCapabilities = {
   mode: "mock",
+  realControlPlane: false,
+  deployments: true,
   realInfrastructure: false,
   realGitHub: false,
   realDomains: false,
   realMetrics: false,
   realLogs: false,
   secretReveal: true,
+  secretRevealRequiresPassword: false,
 }
 
 /** How many idempotency keys the mock remembers before forgetting the oldest. */

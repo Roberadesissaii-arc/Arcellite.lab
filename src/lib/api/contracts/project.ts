@@ -8,6 +8,7 @@ import {
   RestartPolicySchema,
   TimestampSchema,
 } from "./common"
+import { EnvVarCreateSchema } from "./environment"
 
 /** Where a project's code comes from. Identity only: credentials never belong here. */
 export const ProjectSourceDtoSchema = z.discriminatedUnion("type", [
@@ -133,8 +134,15 @@ const projectConfigFields = {
   autoDeploy: z.boolean(),
 }
 
-/** Create a project. Environment variables are a separate resource. */
-export const ProjectCreateRequestSchema = z.strictObject({ ...projectConfigFields, source: ProjectSourceInputSchema })
+/**
+ * Create a project, optionally with its first environment variables in the same
+ * transaction. Later variable changes go through the environment resource.
+ */
+export const ProjectCreateRequestSchema = z.strictObject({
+  ...projectConfigFields,
+  source: ProjectSourceInputSchema,
+  env: z.array(EnvVarCreateSchema).max(200).optional(),
+})
 export type ProjectCreateRequest = z.infer<typeof ProjectCreateRequestSchema>
 
 export const ProjectUpdateRequestSchema = z.strictObject(projectConfigFields).partial()

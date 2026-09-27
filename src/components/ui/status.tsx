@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   ArrowUpRight,
   Check,
+  Circle,
   CircleAlert,
   Clock,
   FolderUp,
@@ -69,7 +70,9 @@ const domain: Record<DomainStatus, { tone: Tone; icon: LucideIcon; label: string
   invalid: { tone: "danger", icon: CircleAlert, label: "Invalid" },
 }
 
-export function DeploymentStatusView({ value }: { value: DeploymentStatus }) {
+/** `neverDeployed` is for providers without deployments: the project exists but nothing has run. */
+export function DeploymentStatusView({ value, neverDeployed = false }: { value: DeploymentStatus; neverDeployed?: boolean }) {
+  if (neverDeployed) return <Status tone="neutral" icon={Circle} label="Not deployed" />
   const item = deployment[value]
   return <Status {...item} />
 }

@@ -7,16 +7,29 @@ import type { AppState, Deployment, LogEntry, LogQuery, ProjectHealth, ServerMet
 
 const DeployContext = createContext<DeployProviderContract>(mockDeployProvider)
 
-/** Supplies the deploy provider to the tree and runs its lifecycle (storage load, streams). */
+/**
+ * Supplies the deploy provider to the tree and, unless `autoStart` is false, runs its
+ * lifecycle (storage load, streams). The server provider starts only inside signed-in
+ * pages, through `DeployLifecycle`, so /login and /setup never request workspace data.
+ */
 export function DeployProvider({
   provider = mockDeployProvider,
+  autoStart = true,
   children,
 }: {
   provider?: DeployProviderContract
+  autoStart?: boolean
   children: React.ReactNode
 }) {
-  useEffect(() => provider.start?.(), [provider])
+  useEffect(() => (autoStart ? provider.start?.() : undefined), [provider, autoStart])
   return <DeployContext.Provider value={provider}>{children}</DeployContext.Provider>
+}
+
+/** Starts the provider while mounted. Starting is reference-counted by the provider. */
+export function DeployLifecycle() {
+  const provider = useDeploy()
+  useEffect(() => provider.start?.(), [provider])
+  return null
 }
 
 export function useDeploy(): DeployProviderContract {

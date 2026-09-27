@@ -2,12 +2,17 @@
 
 import * as Tooltip from "@radix-ui/react-tooltip"
 import { MotionConfig } from "motion/react"
+import { useState } from "react"
+import { mockDeployProvider } from "@/lib/deploy/mock-provider"
 import { DeployProvider, useDeployState } from "@/lib/deploy/react"
+import { createServerDeployProvider } from "@/lib/deploy/server-provider"
 import { ToastProvider } from "./ui/toast"
 
-export function Providers({ children }: { children: React.ReactNode }) {
+/** `mode` comes from ARCELLITE_PROVIDER on the server; the browser never chooses it. */
+export function Providers({ mode, children }: { mode: "mock" | "server"; children: React.ReactNode }) {
+  const [provider] = useState(() => (mode === "server" ? createServerDeployProvider({ documentPrefs: true }) : mockDeployProvider))
   return (
-    <DeployProvider>
+    <DeployProvider provider={provider} autoStart={mode === "mock"}>
       <ToastProvider>
         <MotionBridge>{children}</MotionBridge>
       </ToastProvider>

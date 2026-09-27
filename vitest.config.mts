@@ -2,14 +2,19 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { defineConfig } from "vitest/config"
 
+const root = path.dirname(fileURLToPath(import.meta.url))
+
 export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    // Database tests run with `pnpm test:integration` against PostgreSQL.
+    exclude: ["src/**/*.integration.test.ts", "node_modules/**"],
   },
   resolve: {
     alias: {
-      "@": path.resolve(path.dirname(fileURLToPath(import.meta.url)), "src"),
+      "@": path.resolve(root, "src"),
+      "server-only": path.resolve(root, "src/test/server-only-stub.ts"),
     },
   },
 })

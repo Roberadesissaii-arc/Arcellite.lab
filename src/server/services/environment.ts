@@ -67,8 +67,16 @@ export async function listEnvironment(actor: Actor, projectId: string): Promise<
 async function afterChange(tx: Tx, actor: Actor, projectId: string, projectName: string, action: string, variable: { id: string; key: string; scope: string; secret: boolean }, eventType: "environment.updated" | "environment.deleted") {
   await recordActivity(tx, actor, { action: eventType === "environment.deleted" ? "Environment variable removed" : "Environment variable updated", result: "info", objectType: "Project", objectId: projectId, objectName: projectName, href: `/projects/${projectId}/environment`, detail: variable.key })
   // Key names and flags only: values never enter audit, activity, or events.
-  await writeAudit(tx, { workspaceId: actor.workspaceId, actorUserId: actor.userId, action, outcome: "success", objectType: "environment_variable", objectId: variable.id, requestId: actor.requestId, metadata: { projectId, key: variable.key, scope: variable.scope, secret: variable.secret } })
+  await writeAudit(tx, { workspaceId: actor.workspaceId, actorUserId: actor.userId, action, outcome: "success", objectType: "environment_variable", objectId: variable.id, requestId: actor.requestId, metadata: { projectId, key: variable.key, scope: variable.scope, kind: variable.secret ? "secret" : "plain" } })
   await publishEvent(tx, { workspaceId: actor.workspaceId, type: eventType, objectType: "environment_variable", objectId: variable.id, payload: { projectId, key: variable.key } })
+}
+
+export async function getVariable(actor: Actor, projectId: string, variableId: string): Promise<EnvVarDTO> {
+  await requireCapability(actor, "read_project")
+  await requireProject(db(), actor, projectId)
+  const [row] = await db().select().from(environmentVariables).where(and(eq(environmentVariables.id, variableId), eq(environmentVariables.projectId, projectId))).limit(1)
+  if (!row) throw notFound("That variable")
+  return toEnvVarDTO(row)
 }
 
 export async function createVariable(tx: Tx, actor: Actor, projectId: string, input: EnvVarCreate): Promise<EnvVarDTO> {

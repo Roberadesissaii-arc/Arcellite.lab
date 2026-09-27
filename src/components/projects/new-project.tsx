@@ -103,6 +103,8 @@ export function NewProjectView({ source: routeSource }: { source?: string } = {}
   const [formError, setFormError] = useState<string | null>(null)
   const [deploying, setDeploying] = useState(false)
   const cancelUpload = useRef(false)
+  // One key per deploy intent: a double click or a retry of the same form reuses it.
+  const [intent, setIntent] = useState<{ fingerprint: string; key: string } | null>(null)
   const folderRef = useRef<HTMLInputElement>(null)
 
   const suggestedPort = state ? nextFreePort(state.projects, state.settings.portStart) : 8085
@@ -237,7 +239,7 @@ export function NewProjectView({ source: routeSource }: { source?: string } = {}
     }
     setDeploying(true)
     try {
-      const project = await deploy.createProject({
+      const input: Parameters<typeof deploy.createProject>[0] = {
         name: parsed.data.name,
         environment: parsed.data.environment,
         framework: parsed.data.framework,
@@ -258,7 +260,16 @@ export function NewProjectView({ source: routeSource }: { source?: string } = {}
         memoryLimitMb: parsed.data.memoryLimitMb ? Number(parsed.data.memoryLimitMb) : null,
         restartPolicy: parsed.data.restartPolicy,
         env: env.filter((item) => item.key.trim()),
-      })
+      }
+      const fingerprint = JSON.stringify(input)
+      const attempt = intent?.fingerprint === fingerprint ? intent : { fingerprint, key: crypto.randomUUID() }
+      setIntent(attempt)
+      const project = await deploy.createProject(input, { idempotencyKey: attempt.key })
+      if (!deploy.capabilities.deployments) {
+        toast({ title: "Project saved", description: "Deployments are not connected to this control plane yet." })
+        router.push(`/projects/${project.id}`)
+        return
+      }
       if (parsed.data.simulateFailure && deploy.dev) await deploy.dev.setSimulateFailure(project.id, true)
       const deployment = await deploy.startDeployment(project.id)
       router.push(`/deployments/${deployment.id}`)

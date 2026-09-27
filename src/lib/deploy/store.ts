@@ -12,6 +12,7 @@ import {
   shouldFailVerification,
   sourceText,
   uniqueSlug,
+  SERVER_IP,
 } from "./helpers"
 import type {
   ActivityEvent,
@@ -273,7 +274,7 @@ export function createMockStore(options: MockStoreOptions = {}) {
           objectType: "Deployment",
           objectName: project.name,
           href: `/deployments/${deployment.id}`,
-          detail: `${deployment.commitSha} · ${projectEndpoint(project)}`,
+          detail: `${deployment.commitSha} · ${projectEndpoint(project, SERVER_IP)}`,
           timestamp: deployment.finishedAt ?? stamp,
         },
       )

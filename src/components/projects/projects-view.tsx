@@ -47,6 +47,7 @@ export function ProjectsView() {
         now,
         serverIp,
         badgeFor: (project) => projectBadge(project, deploy.latestDeployment(project.id)),
+        neverDeployed: (project) => !deploy.capabilities.deployments && !deploy.latestDeployment(project.id),
       })
     : []
 
@@ -72,6 +73,10 @@ export function ProjectsView() {
   }, [router])
 
   const handleCopyEndpoint = useCallback((endpoint: string) => {
+    if (!endpoint) {
+      toast({ title: "No endpoint yet", description: "No server is connected to publish this project on." })
+      return
+    }
     void copyText(endpoint).then((ok) =>
       toast(ok ? { title: "Endpoint copied" } : { title: "Could not copy", tone: "danger" }),
     )

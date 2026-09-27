@@ -28,7 +28,7 @@ export function OverviewView() {
   const inFlight = state.deployments.filter((item) => !["ready", "failed", "canceled", "stopped"].includes(item.status))
   const failed = projects.filter((project) => projectBadge(project, deploy.latestDeployment(project.id)) === "failed")
   const waiting = state.domains.filter((domain) => domain.status === "dns-required" || domain.status === "invalid")
-  const headline = !server || server.status === "offline" ? "Server unavailable." : failed.length
+  const headline = !server ? (deploy.capabilities.realControlPlane ? "No server connected." : "Server unavailable.") : server.status === "offline" ? "Server unavailable." : failed.length
     ? "A deployment needs attention." : inFlight.length ? "A deployment is in progress." : "Infrastructure is healthy."
 
   const running = projects.filter(project => projectBadge(project, deploy.latestDeployment(project.id)) === "ready").length
@@ -47,7 +47,7 @@ export function OverviewView() {
           <h1>{greeting(state.settings.displayName, now)}</h1>
           <p className="intro-description">Your projects, from first commit to production. Deploy to your own server and keep every release, container, and domain in view.</p>
           <div className="intro-actions"><Link href="/projects/new" className="btn btn-primary"><Plus size={15} />Deploy a project</Link><Link href="/docs" className="intro-text-link">Quick start<ArrowUpRight size={14} /></Link></div>
-          <p className="intro-footnote"><span className="status-dot" />{headline}<span className="text-faint">Phase 1 · simulated infrastructure</span></p>
+          <p className="intro-footnote"><span className="status-dot" />{headline}<span className="text-faint">{deploy.capabilities.realControlPlane ? "Control plane only · deployments are not connected yet" : "Phase 1 · simulated infrastructure"}</span></p>
         </div>
         <div className="intro-system" aria-label="Deployment workflow">
           <div className="system-caption"><span>YOUR DEPLOYMENT PIPELINE</span><span className="system-mode">Self-hosted</span></div>
@@ -80,7 +80,7 @@ export function OverviewView() {
                 <span className="project-identity"><span className="framework-mark">{project.framework === "fastapi" ? <Zap aria-hidden /> : <Code2 aria-hidden />}</span><span className="min-w-0"><strong>{project.name}</strong><small>{sourceText(project)}</small></span></span>
                 <span className="project-environment capitalize text-muted">{project.environment}</span>
                 <span className="framework-label text-muted">{FRAMEWORKS[project.framework].label}</span>
-                <DeploymentStatusView value={projectBadge(project, latest)} />
+                <DeploymentStatusView value={projectBadge(project, latest)} neverDeployed={!deploy.capabilities.deployments && !latest} />
                 <time className="text-faint tabular-nums" dateTime={project.updatedAt}>{formatRelative(project.updatedAt, now)}</time>
               </Link></li>
             })}

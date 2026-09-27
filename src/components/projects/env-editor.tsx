@@ -80,11 +80,11 @@ export function EnvEditor({
                       aria-label={`Value for ${item.key || "variable"}`}
                       type={item.secret && !visible[item.id] ? "password" : "text"}
                       value={item.value}
-                      placeholder="value"
+                      placeholder={item.stored && !item.value ? "Saved · type to replace" : "value"}
                       spellCheck={false}
                       onChange={(event) => update(index, { value: event.target.value })}
                     />
-                    {item.secret ? (
+                    {item.secret && !(item.stored && !item.value) ? (
                       <button type="button" className="ee-reveal" aria-label={visible[item.id] ? "Hide value" : "Reveal value"} onClick={() => setVisible((current) => ({ ...current, [item.id]: !current[item.id] }))}>
                         {visible[item.id] ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
                       </button>

@@ -68,9 +68,9 @@ export function DomainsView() {
                   <div className="card-head">
                     <IconTile icon={Network} tone="brand" />
                     <div className="min-w-0"><p className="card-title">{project.name}</p><p className="card-sub">Port {project.exposedPort} → {project.internalPort}</p></div>
-                    <CopyButton value={endpoint} label="Copy" onCopied={(ok) => toast(ok ? { title: "Endpoint copied" } : { title: "Could not copy", tone: "danger" })} />
+                    {endpoint ? <CopyButton value={endpoint} label="Copy" onCopied={(ok) => toast(ok ? { title: "Endpoint copied" } : { title: "Could not copy", tone: "danger" })} /> : null}
                   </div>
-                  <code className="code-chip">{endpoint}</code>
+                  <code className="code-chip">{endpoint || "Not published · no server connected"}</code>
                 </div>
               )
             })}

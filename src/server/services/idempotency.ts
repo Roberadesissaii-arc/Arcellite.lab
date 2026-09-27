@@ -2,7 +2,7 @@ import "server-only"
 import { and, eq, lt, sql } from "drizzle-orm"
 import { ApiFailure } from "@/server/api/failure"
 import type { Actor } from "@/server/auth/authorize"
-import { sha256Hex } from "@/server/crypto/tokens"
+import { keyedDigest } from "@/server/crypto/secret-box"
 import { db, type Tx } from "@/server/db/client"
 import { idempotencyKeys } from "@/server/db/schema"
 
@@ -54,7 +54,7 @@ export async function runIdempotent<T>(
     const result = await db().transaction(operation)
     return { ...result, replayed: false }
   }
-  const requestHash = sha256Hex(stableStringify(request))
+  const requestHash = keyedDigest(`${name}\n${stableStringify(request)}`)
   return db().transaction(async (tx) => {
     await tx
       .delete(idempotencyKeys)

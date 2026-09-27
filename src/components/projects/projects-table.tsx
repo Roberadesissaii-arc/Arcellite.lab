@@ -23,6 +23,7 @@ export type ProjectTableRow = {
   status: DeploymentStatus
   hostname: string
   endpoint: string
+  neverDeployed?: boolean
   updatedAt: string
   updatedLabel: string
   project: Project
@@ -80,7 +81,7 @@ function buildColumns(actions: Omit<ProjectsTableProps, "rows" | "now">): DataCo
       accessorKey: "status",
       cell: ({ row }) => (
         <span className="table-status" data-status={row.original.status}>
-          <DeploymentStatusView value={row.original.status} />
+          <DeploymentStatusView value={row.original.status} neverDeployed={row.original.neverDeployed} />
         </span>
       ),
       header: "Status",
@@ -141,6 +142,7 @@ export function mapProjectsToTableRows(
     now: number
     serverIp?: string
     badgeFor: (project: Project) => DeploymentStatus
+    neverDeployed?: (project: Project) => boolean
   },
 ): ProjectTableRow[] {
   return projects.map((project) => ({
@@ -151,6 +153,7 @@ export function mapProjectsToTableRows(
     framework: project.framework,
     frameworkLabel: FRAMEWORKS[project.framework].label,
     status: opts.badgeFor(project),
+    neverDeployed: opts.neverDeployed?.(project) ?? false,
     hostname: project.hostname,
     endpoint: projectEndpoint(project, opts.serverIp),
     updatedAt: project.updatedAt,

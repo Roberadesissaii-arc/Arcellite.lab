@@ -69,7 +69,7 @@ export function ProjectFrame({ children }: { children: React.ReactNode }) {
             <h1 className="page-title mt-1 font-heading">{project.name}<span className="text-brand">.</span></h1>
             <p className="page-copy mt-2">{sourceText(project)}</p>
             <div className="project-hero-meta">
-              <DeploymentStatusView value={projectBadge(project, latest)} />
+              <DeploymentStatusView value={projectBadge(project, latest)} neverDeployed={!deploy.capabilities.deployments && !latest} />
               <Tag tone={project.environment === "production" ? "brand" : project.environment === "preview" ? "info" : "neutral"}><span className="capitalize">{project.environment}</span></Tag>
               <Tag>{FRAMEWORKS[project.framework].label}</Tag>
               {project.branch ? <Tag><GitBranch size={11} aria-hidden />{project.branch}</Tag> : null}

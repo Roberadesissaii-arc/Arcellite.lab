@@ -15,6 +15,7 @@ import { useDeploy, useDeployState } from "@/lib/deploy/react"
 import type { EnvironmentVariable } from "@/lib/deploy/types"
 import { looksSecret, parseDotenv } from "@/lib/deploy/dotenv"
 import { KeyGlyph } from "@/components/environment/key-glyph"
+import { useSecretReveal } from "@/components/environment/reveal-dialog"
 
 type Scope = EnvironmentVariable["scope"]
 const SCOPES: { value: Scope | "any"; label: string }[] = [
@@ -41,6 +42,7 @@ export function EnvironmentView() {
   const [scope, setScope] = useState<Scope | "any">("any")
   const [search, setSearch] = useState("")
   const [revealed, setRevealed] = useState<Record<string, boolean>>({})
+  const reveal = useSecretReveal()
   const [adding, setAdding] = useState(false)
   const [removing, setRemoving] = useState<EnvironmentVariable | null>(null)
   const [draft, setDraft] = useState({ key: "", value: "", scope: "all" as Scope, secret: true })
@@ -128,7 +130,7 @@ export function EnvironmentView() {
             <ul className="env-projects">
               {state.projects.map((item) => (
                 <li key={item.id}>
-                  <button type="button" className="pressable" aria-current={item.id === project?.id} onClick={() => { setPicked(item.id); setRevealed({}); setPage(0) }}>
+                  <button type="button" className="pressable" aria-current={item.id === project?.id} onClick={() => { setPicked(item.id); setRevealed({}); reveal.forget(); setPage(0) }}>
                     <IconTile icon={FolderKanban} tone={item.id === project?.id ? "brand" : "neutral"} size="sm" />
                     <span className="min-w-0 flex-1"><strong>{item.name}</strong><small className="capitalize">{item.environment}</small></span>
                     <span className="section-count">{item.env.length}</span>
@@ -138,7 +140,7 @@ export function EnvironmentView() {
             </ul>
             <div className="env-note">
               <ShieldCheck aria-hidden />
-              <p><strong>How secrets are handled.</strong> Values are written to the container at start and never into the image or build log. In Phase 1 they are stored in this browser only.</p>
+              <p><strong>How secrets are handled.</strong> Values are written to the container at start and never into the image or build log. {deploy.capabilities.realControlPlane ? "Every value is encrypted on the control plane, and showing a saved secret asks for your password." : "In Phase 1 they are stored in this browser only."}</p>
             </div>
           </aside>
 
@@ -177,6 +179,8 @@ export function EnvironmentView() {
                   </div>
                   {visible.map((item) => {
                     const show = !item.secret || revealed[item.id]
+                    // A saved server secret is not in the cache; its value comes from the reveal dialog.
+                    const value = item.secret && reveal.needsPassword ? (reveal.values[item.id] ?? "") : item.value
                     return (
                       <div key={item.id} className="env-row" role="row">
                         <span role="cell" className="env-key">
@@ -186,13 +190,23 @@ export function EnvironmentView() {
                             <small data-secret={item.secret}>{item.secret ? "Secret · masked" : `Plain text · ${item.value.length} chars`}</small>
                           </span>
                         </span>
-                        <span role="cell" className="env-value"><code data-masked={!show}>{show ? item.value || "—" : mask(item.value)}</code></span>
+                        <span role="cell" className="env-value"><code data-masked={!show}>{show ? value || "—" : mask(value)}</code></span>
                         <span role="cell"><Tag tone={SCOPE_TONE[item.scope]}>{SCOPE_LABEL[item.scope]}</Tag></span>
                         <span role="cell" className="env-actions">
                           {item.secret ? (
-                            <button type="button" className="icon-btn" aria-label={show ? `Hide ${item.key}` : `Reveal ${item.key}`} onClick={() => setRevealed((current) => ({ ...current, [item.id]: !current[item.id] }))}>{show ? <EyeOff aria-hidden /> : <Eye aria-hidden />}</button>
+                            <button type="button" className="icon-btn" aria-label={show ? `Hide ${item.key}` : `Reveal ${item.key}`} onClick={() => {
+                              if (!show && reveal.needsPassword && project) {
+                                reveal.request(project.id, item, () => setRevealed((current) => ({ ...current, [item.id]: true })))
+                                return
+                              }
+                              setRevealed((current) => ({ ...current, [item.id]: !current[item.id] }))
+                            }}>{show ? <EyeOff aria-hidden /> : <Eye aria-hidden />}</button>
                           ) : null}
-                          <button type="button" className="icon-btn" aria-label={`Copy ${item.key}`} onClick={() => void copyText(item.value).then((ok) => toast(ok ? { title: `${item.key} copied` } : { title: "Could not copy", tone: "danger" }))}><Copy aria-hidden /></button>
+                          <button type="button" className="icon-btn" aria-label={`Copy ${item.key}`} onClick={() => {
+                            const copy = (text: string) => void copyText(text).then((ok) => toast(ok ? { title: `${item.key} copied` } : { title: "Could not copy", tone: "danger" }))
+                            if (item.secret && reveal.needsPassword && project) reveal.request(project.id, item, copy)
+                            else copy(item.value)
+                          }}><Copy aria-hidden /></button>
                           <button type="button" className="icon-btn" aria-label={`Remove ${item.key}`} onClick={() => setRemoving(item)}><Trash2 aria-hidden /></button>
                         </span>
                       </div>
@@ -289,7 +303,7 @@ export function EnvironmentView() {
                   </li>
                 ))}
               </ul>
-              <p className="env-import-note"><ShieldCheck aria-hidden />Names that look like credentials are marked secret. Values stay in this browser in Phase 1.</p>
+              <p className="env-import-note"><ShieldCheck aria-hidden />Names that look like credentials are marked secret. {deploy.capabilities.realControlPlane ? "Values are encrypted on the control plane." : "Values stay in this browser in Phase 1."}</p>
               {error ? <p className="field-error">{error}</p> : null}
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="ghost" onClick={() => setImporting(null)}>Cancel</Button>
@@ -313,6 +327,7 @@ export function EnvironmentView() {
           void save(project.env.filter((item) => item.id !== target.id), "Variable removed")
         }}
       />
+      {reveal.dialog}
     </div>
   )
 }

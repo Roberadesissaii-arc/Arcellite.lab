@@ -1,0 +1,67 @@
+/* /setup and /login: the shell's near-black rail beside a white workspace, without the shell. */
+
+.auth {
+  display: grid;
+  min-height: 100dvh;
+  grid-template-columns: minmax(0, 1fr);
+  background: var(--workspace-bg);
+}
+@media (min-width: 900px) {
+  .auth { grid-template-columns: minmax(320px, 420px) minmax(0, 1fr); }
+}
+
+.auth-rail {
+  display: none;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 32px 28px;
+  background: var(--sidebar-bg);
+  color: var(--sidebar-text-active);
+}
+@media (min-width: 900px) { .auth-rail { display: flex; } }
+
+.auth-brand { display: flex; align-items: center; gap: 10px; }
+.auth-brand svg { width: 22px; height: 22px; color: var(--brand-primary); }
+.auth-brand strong { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+.auth-brand span { color: var(--sidebar-text); font-size: 13px; font-weight: 500; }
+
+.auth-rail h2 {
+  font-family: var(--font-space-grotesk), var(--font-geist-sans), sans-serif;
+  font-size: 1.5rem;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+}
+.auth-rail p { margin-top: 10px; color: var(--sidebar-text); font-size: 14px; line-height: 1.55; }
+
+.auth-facts { display: grid; gap: 12px; }
+.auth-facts li { display: flex; gap: 10px; align-items: flex-start; color: var(--sidebar-text); font-size: 13px; line-height: 1.45; }
+.auth-facts svg { width: 16px; height: 16px; margin-top: 1px; flex-shrink: 0; color: var(--sidebar-text-active); }
+
+.auth-main { display: grid; place-items: center; padding: 48px 16px; }
+.auth-card { width: 100%; max-width: 400px; }
+.auth-card .auth-brand { margin-bottom: 28px; }
+.auth-card .auth-brand strong { color: var(--text-primary); }
+.auth-card .auth-brand span { color: var(--text-tertiary); }
+@media (min-width: 900px) { .auth-card .auth-brand { display: none; } }
+
+.auth-kicker { font-size: 12px; font-weight: 600; color: var(--brand-primary); letter-spacing: 0.02em; }
+.auth-card h1 { margin-top: 6px; }
+.auth-card form { margin-top: 24px; display: grid; gap: 16px; }
+.auth-card .btn { width: 100%; min-height: 40px; }
+
+.auth-alert {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: var(--status-danger-subtle);
+  color: var(--status-danger);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.auth-alert svg { width: 16px; height: 16px; margin-top: 1px; flex-shrink: 0; }
+
+.auth-foot { margin-top: 20px; font-size: 12px; color: var(--text-tertiary); line-height: 1.5; }

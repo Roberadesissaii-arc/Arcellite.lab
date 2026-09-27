@@ -89,9 +89,12 @@ export type ProjectSource =
 export interface EnvironmentVariable {
   id: string
   key: string
+  /** For a saved secret from the server provider this is "" (write-only); see `stored`. */
   value: string
   secret: boolean
   scope: "all" | EnvironmentName
+  /** Server provider only: a value is saved but was not sent to the browser. "" keeps it. */
+  stored?: boolean
 }
 
 export interface Project {

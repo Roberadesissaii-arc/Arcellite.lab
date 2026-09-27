@@ -47,8 +47,9 @@ export function shortSha(input: string): string {
   return (hash >>> 0).toString(16).padStart(8, "0").slice(0, 7)
 }
 
-export function projectEndpoint(project: Pick<Project, "exposedPort">, ip = SERVER_IP): string {
-  return `http://${ip}:${project.exposedPort}`
+/** The LAN URL of a project, or "" when no server is connected to publish it on. */
+export function projectEndpoint(project: Pick<Project, "exposedPort">, ip: string | undefined): string {
+  return ip ? `http://${ip}:${project.exposedPort}` : ""
 }
 
 export function nextFreePort(projects: Project[], start: number): number {

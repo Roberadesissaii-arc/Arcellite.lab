@@ -1,7 +1,10 @@
 import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono, Space_Grotesk } from "next/font/google"
+import { headers } from "next/headers"
+import { connection } from "next/server"
 import { themeBootScript } from "@/lib/theme-script"
 import { Providers } from "@/components/providers"
+import { providerMode } from "@/server/config"
 import "./globals.css"
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist-sans", display: "swap" })
@@ -23,7 +26,10 @@ export const viewport: Viewport = {
   colorScheme: "light",
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Every page renders per request so the CSP nonce from src/proxy.ts applies.
+  await connection()
+  const nonce = (await headers()).get("x-nonce") ?? undefined
   return (
     <html
       lang="en"
@@ -31,10 +37,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${geist.variable} ${display.variable} ${mono.variable} h-full`}
     >
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
       <body className="min-h-full font-sans antialiased">
-        <Providers>{children}</Providers>
+        <Providers mode={providerMode()}>{children}</Providers>
       </body>
     </html>
   )

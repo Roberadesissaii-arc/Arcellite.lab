@@ -38,7 +38,7 @@ export interface ApiResult {
   cookies?: string[]
 }
 
-type Handler<P, C> = (ctx: C) => Promise<ApiResult | Response>
+type Handler<C> = (ctx: C) => Promise<ApiResult | Response>
 type NextHandler<P> = (request: Request, context: { params: Promise<P> }) => Promise<Response>
 
 function respond(requestId: string, result: ApiResult): Response {
@@ -142,7 +142,7 @@ async function run(requestId: string, work: () => Promise<ApiResult | Response>)
 }
 
 /** A route that needs no session (health, sign-in, setup). Unsafe methods still require a trusted Origin. */
-export function publicRoute<P = Record<string, never>>(handler: Handler<P, RouteContext<P>>): NextHandler<P> {
+export function publicRoute<P = Record<string, never>>(handler: Handler<RouteContext<P>>): NextHandler<P> {
   return async (request, context) => {
     const requestId = randomUUID()
     return run(requestId, async () => {
@@ -157,7 +157,7 @@ export function publicRoute<P = Record<string, never>>(handler: Handler<P, Route
  * Origin and an X-CSRF-Token header that matches both the CSRF cookie and the token hash
  * stored with the session.
  */
-export function sessionRoute<P = Record<string, never>>(handler: Handler<P, AuthedContext<P>>): NextHandler<P> {
+export function sessionRoute<P = Record<string, never>>(handler: Handler<AuthedContext<P>>): NextHandler<P> {
   return async (request, context) => {
     const requestId = randomUUID()
     return run(requestId, async () => {

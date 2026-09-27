@@ -8,6 +8,7 @@ import { db, type Executor, type Tx } from "@/server/db/client"
 import { projectBuildConfigs, projectRuntimeConfigs, projects, projectSources } from "@/server/db/schema"
 import { publishEvent } from "@/server/events/publish"
 import { recordActivity } from "./activity"
+import { createVariable } from "./environment"
 
 const selection = {
   project: projects,
@@ -180,6 +181,7 @@ export async function createProject(tx: Tx, actor: Actor, input: ProjectCreateRe
   })
   await writeAudit(tx, { workspaceId: actor.workspaceId, actorUserId: actor.userId, action: "project.create", outcome: "success", objectType: "project", objectId: project.id, requestId: actor.requestId, metadata: { name: input.name, sourceType: type } })
   await publishEvent(tx, { workspaceId: actor.workspaceId, type: "project.created", objectType: "project", objectId: project.id, payload: { name: input.name } })
+  for (const variable of input.env ?? []) await createVariable(tx, actor, project.id, variable)
   const row = await findProject(tx, actor.workspaceId, project.id)
   if (!row) throw notFound("That project")
   return toProjectDTO(row)

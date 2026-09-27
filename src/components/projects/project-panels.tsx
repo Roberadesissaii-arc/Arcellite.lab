@@ -145,9 +145,13 @@ export function ProjectOverview() {
             <div className="min-w-0 flex-1"><h2>Endpoints</h2><p>Where this project is reachable</p></div>
           </div>
           <div className="project-endpoint">
-            <code>{endpoint}</code>
-            <button type="button" className="icon-btn" aria-label="Copy endpoint" onClick={() => void copyText(endpoint).then((ok) => toast(ok ? { title: "Endpoint copied" } : { title: "Could not copy", tone: "danger" }))}><Copy aria-hidden /></button>
-            <a className="icon-btn" href={endpoint} target="_blank" rel="noreferrer" aria-label="Open endpoint"><ExternalLink aria-hidden /></a>
+            <code>{endpoint || "Not published · no server connected"}</code>
+            {endpoint ? (
+              <>
+                <button type="button" className="icon-btn" aria-label="Copy endpoint" onClick={() => void copyText(endpoint).then((ok) => toast(ok ? { title: "Endpoint copied" } : { title: "Could not copy", tone: "danger" }))}><Copy aria-hidden /></button>
+                <a className="icon-btn" href={endpoint} target="_blank" rel="noreferrer" aria-label="Open endpoint"><ExternalLink aria-hidden /></a>
+              </>
+            ) : null}
           </div>
           <ul className="project-domain-list">
             {domains.map((domain) => <li key={domain.id}><span className="min-w-0 flex-1 truncate font-medium">{domain.name}</span><DomainStatusView value={domain.status} /></li>)}
@@ -440,11 +444,15 @@ export function ProjectDomains() {
       <Reveal className="pdm-endpoint">
         <span className="pdm-endpoint-icon"><Network aria-hidden /></span>
         <div className="min-w-0 flex-1">
-          <p className="pdm-endpoint-label">Local endpoint · always on</p>
-          <code>{endpoint}</code>
+          <p className="pdm-endpoint-label">{endpoint ? "Local endpoint · always on" : "Local endpoint"}</p>
+          <code>{endpoint || "Not published · no server connected"}</code>
         </div>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={() => void copyText(endpoint).then((ok) => toast(ok ? { title: "Endpoint copied" } : { title: "Could not copy", tone: "danger" }))}><Copy aria-hidden />Copy</button>
-        <a className="btn btn-primary btn-sm" href={endpoint} target="_blank" rel="noreferrer"><ExternalLink aria-hidden />Open</a>
+        {endpoint ? (
+          <>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => void copyText(endpoint).then((ok) => toast(ok ? { title: "Endpoint copied" } : { title: "Could not copy", tone: "danger" }))}><Copy aria-hidden />Copy</button>
+            <a className="btn btn-primary btn-sm" href={endpoint} target="_blank" rel="noreferrer"><ExternalLink aria-hidden />Open</a>
+          </>
+        ) : null}
       </Reveal>
 
       <Reveal index={1}>
